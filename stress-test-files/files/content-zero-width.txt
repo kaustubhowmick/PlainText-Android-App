@@ -1,0 +1,13 @@
+Zero-width space between letters: a​b​c​d
+Zero-width non-joiner: a‌b, Persian: می‌خواهم
+Zero-width joiner: a‍b
+Word joiner: a⁠b
+BOM as ZWNBSP mid-line: a﻿b
+Soft hyphen: super­cali­fragi­listic
+Invisible separators: x⁡y⁢z⁣w⁤v
+Search trap: pass​word (looks like 'password')
+Line containing only zero-width chars: ​‌‍⁠
+​​​
+Combining marks: é ä ñ (decomposed)
+Stacked combining marks: Z̶̵̴a̷̸l̡̢ģǫ
+Non-breaking spaces: a b c d

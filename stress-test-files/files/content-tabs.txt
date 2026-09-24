@@ -1,0 +1,13 @@
+	one leading tab
+		two leading tabs
+										ten leading tabs
+trailing tab	
+a	b	c	d	e
+col1	col2	col3
+longer value	x	y
+x	longer value	y
+	
+Tabs and spaces:	  	  	mixed
+Tab after emoji: 😀	x
+Tab after CJK: 日本	x
+																																																																																																																																																																																																								200 tabs then text

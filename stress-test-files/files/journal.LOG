@@ -1,0 +1,9 @@
+.LOG
+10:15 AM 3/2/2026
+Started the stress test.
+
+2:47 PM 3/2/2026
+Opened the 50 MB file; preview dialog shown.
+
+9:03 AM 3/3/2026
+Checked the .LOG timestamp is appended on open.

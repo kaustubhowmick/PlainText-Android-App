@@ -1,0 +1,8 @@
+PlainText encoding test
+ASCII: The quick brown fox jumps over the lazy dog.
+Latin-1: café, naïve, über, señor, Ærøskøbing
+Euro and quotes: € “smart quotes” ‘single’ – en dash — em dash …
+Greek: Καλημέρα κόσμε
+Cyrillic: Привет, мир
+CJK: 你好世界 こんにちは 안녕하세요
+Emoji: 😀 👍🏽 👨‍👩‍👧

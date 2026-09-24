@@ -98,3 +98,26 @@ jobs:
           name: lint-report
           path: app/build/reports/lint-results-debug.html
           if-no-files-found: ignore
+
+  stress-test-files:
+    name: Stress-test files
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      # Regenerates the git-ignored large files; the checksum check also proves
+      # the committed small files and checksums.txt match the script.
+      - name: Generate and verify
+        run: |
+          python3 stress-test-files/generate.py
+          git diff --exit-code -- stress-test-files
+          cd stress-test-files && sha256sum -c checksums.txt
+      - name: Upload stress-test files
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-test-files
+          path: stress-test-files/
+          if-no-files-found: error

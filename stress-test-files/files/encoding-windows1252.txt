@@ -1,0 +1,7 @@
+Windows-1252 (ANSI) test
+e acute: é  É
+u umlaut: ü  Ü
+n tilde: ñ  Ñ
+Euro sign (byte 0x80): €
+Words: café, über, mañana, 100 €
+Other 0x80-0x9F: ‚ ƒ „ … † ‡ ˆ ‰ Š ‹ Œ Ž ‘ ’ “ ” • – — ˜ ™ š › œ ž Ÿ
