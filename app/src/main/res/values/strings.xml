@@ -3,4 +3,38 @@
     <string name="app_name">PlainText</string>
     <string name="untitled">Untitled</string>
     <string name="editor_hint">Document text</string>
+
+    <!-- Title suffixes (design.md §5.22) -->
+    <string name="suffix_read_only">" (Read-only)"</string>
+    <string name="suffix_preview">" (Preview)"</string>
+    <string name="suffix_deleted">" (deleted)"</string>
+
+    <!-- Menus -->
+    <string name="menu_file">File</string>
+    <string name="menu_edit">Edit</string>
+    <string name="new_document">New</string>
+    <string name="save">Save</string>
+    <string name="exit">Exit</string>
+    <string name="undo">Undo</string>
+    <string name="redo">Redo</string>
+    <string name="cut">Cut</string>
+    <string name="copy">Copy</string>
+    <string name="paste">Paste</string>
+    <string name="delete">Delete</string>
+    <string name="select_all">Select All</string>
+
+    <!-- Unsaved-changes prompt (design.md §6.10) -->
+    <string name="save_changes_to">Do you want to save changes to %1$s?</string>
+    <string name="dont_save">Don\'t Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+
+    <!-- Recovery (design.md §5.30) -->
+    <string name="recover_title">Recover unsaved changes?</string>
+    <string name="recover_message">PlainText closed before your changes to %1$s were saved (edited %2$s).</string>
+    <string name="restore">Restore</string>
+    <string name="discard">Discard</string>
+
+    <string name="saved">Saved</string>
+    <string name="no_changes">No changes to save</string>
 </resources>
