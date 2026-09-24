@@ -25,14 +25,15 @@ import io.github.kaustubhowmick.plaintext.R
  * Android lays out an EditText by measuring every paragraph of the affected
  * text in one pass, holding a measurement object per paragraph until the pass
  * ends. For a few hundred thousand lines that runs out of memory (a
- * 500,000-line file crashed on open). So whole-text changes and layout rebuilds
- * go through [setTextInSlices], [replaceInSlices], and [onMeasure], which add
- * the text a slice at a time: each pass stays small and the finished layout is
- * the same.
+ * 500,000-line file crashed on open). So for texts of more than [MANY_LINES]
+ * lines, whole-text changes and layout rebuilds go through [setTextInSlices],
+ * [replaceInSlices], and [onMeasure], which add the text [SLICE_LINES] lines at
+ * a time: each pass stays small and the finished text is the same.
  *
- * Each inserted slice also becomes one block of the layout, and drawing or
- * editing re-records a whole block. Slices are therefore small (about a
- * screenful), like the blocks Android makes when it lays out text in one go.
+ * Smaller texts keep the one-pass path: each inserted slice becomes one block
+ * of the layout that is redrawn as a whole, and while an accessibility service
+ * is on, TextView copies the whole text on every insert. Both make many small
+ * slices slow.
  */
 class EditorView @JvmOverloads constructor(
     context: Context,
@@ -100,14 +101,14 @@ class EditorView @JvmOverloads constructor(
         tabStops.width = (paint.measureText(" ") * 8).toInt().coerceAtLeast(1)
     }
 
-    /** Replaces the whole text with [content], adding it in slices (see the class comment). */
+    /** Replaces the whole text with [content], in slices if it is long (see the class comment). */
     fun setTextInSlices(content: CharSequence) {
+        val first = if (TextSlices.hasMoreLinesThan(content, MANY_LINES)) sliceEnd(content, 0) else content.length
         withoutFilters {
-            setText("") // a fresh Editable, and the IME starts over
-            // Attached while the text is empty, the inclusive span grows with each slice.
-            // Adding it over a big text would re-lay out all of it at once.
-            text.setSpan(tabStops, 0, 0, Spanned.SPAN_INCLUSIVE_INCLUSIVE)
-            insertSlices(text, 0, content)
+            setText(content.subSequence(0, first)) // a fresh Editable, and the IME starts over
+            // Inclusive, so the span grows with the slices inserted at its end.
+            text.setSpan(tabStops, 0, text.length, Spanned.SPAN_INCLUSIVE_INCLUSIVE)
+            if (first < content.length) insertSlices(text, first, content.subSequence(first, content.length))
         }
     }
 
@@ -129,7 +130,7 @@ class EditorView @JvmOverloads constructor(
         try {
             var from = 0
             while (from < content.length) {
-                val to = TextSlices.end(content, from, SLICE_LINES, SLICE_CHARS)
+                val to = sliceEnd(content, from)
                 t.insert(at + from, content, from, to)
                 from = to
             }
@@ -137,6 +138,8 @@ class EditorView @JvmOverloads constructor(
             endBatchEdit()
         }
     }
+
+    private fun sliceEnd(content: CharSequence, from: Int) = TextSlices.end(content, from, SLICE_LINES, SLICE_CHARS)
 
     private inline fun withoutFilters(block: () -> Unit) {
         val saved = filters
@@ -287,12 +290,15 @@ class EditorView @JvmOverloads constructor(
     }
 
     companion object {
-        /** More lines than this, and a relayout of all the text goes through slices. */
-        const val MANY_LINES = 10_000
+        /**
+         * Texts with more lines than this are laid out in slices. A 142,000-line
+         * file lays out fine in one pass on a 192 MB heap; 500,000 lines don't.
+         */
+        const val MANY_LINES = 200_000
 
         /** A slice ends after this many lines, or after the line that reaches [SLICE_CHARS]. */
-        const val SLICE_LINES = 100
-        const val SLICE_CHARS = 4_000
+        const val SLICE_LINES = 20_000
+        const val SLICE_CHARS = 1_000_000
 
         /** Keeps the destination unchanged: used for view-only documents. */
         private val REJECT_ALL = InputFilter { _, _, _, dest, dstart, dend -> dest.subSequence(dstart, dend) }

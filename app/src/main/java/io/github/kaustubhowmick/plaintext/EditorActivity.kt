@@ -1982,7 +1982,7 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
      * to notice: many characters, many lines, or one very long line.
      */
     private fun isLargeDocument() =
-        editor.length() > LARGE_FILE_CHARS || session.lines.lineCount > EditorView.MANY_LINES
+        editor.length() > LARGE_FILE_CHARS || session.lines.lineCount > LARGE_FILE_LINES
 
     /**
      * Runs [change], which re-lays out the whole text. For a large document
@@ -2116,6 +2116,7 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
         const val MAX_FILE_BYTES = 10 * 1024 * 1024
         const val LARGE_FILE_CHARS = 1_000_000
         const val LONG_LINE_CHARS = 100_000
+        const val LARGE_FILE_LINES = 10_000
         const val RECOVERY_DELAY_MS = 3000L
         const val RECOVERY_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
         const val PROGRESS_DELAY_MS = 300L
