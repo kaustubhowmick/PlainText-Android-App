@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="background">#FFFFFF</color>
+    <color name="bar">#F3F3F3</color>
+    <color name="divider">#1F000000</color>
+    <color name="accent">#0B5CAD</color>
+    <color name="toggle_on">#330B5CAD</color>
+    <!-- API 26 can't draw dark navigation-bar icons, so keep the bar dark there. -->
+    <color name="nav_bar">#000000</color>
+    <color name="launcher_background">#FFFFFF</color>
+</resources>

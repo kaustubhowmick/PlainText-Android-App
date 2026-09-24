@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A sheet of lined paper inside the 66dp adaptive-icon safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#1565C0"
+        android:pathData="M36,28h28l10,10v42a2,2 0,0 1,-2 2h-36a2,2 0,0 1,-2 -2v-50a2,2 0,0 1,2 -2z" />
+    <path
+        android:fillColor="#90CAF9"
+        android:pathData="M64,28v8a2,2 0,0 0,2 2h8z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M41,46h26v3h-26z M41,54h26v3h-26z M41,62h26v3h-26z M41,70h16v3h-16z" />
+</vector>

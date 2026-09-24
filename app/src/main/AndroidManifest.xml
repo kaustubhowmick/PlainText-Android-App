@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- No <uses-permission> elements. Intentionally none (design.md §4.1). -->
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:theme="@style/Theme.PlainText"
+        android:allowBackup="false"
+        android:supportsRtl="true"
+        android:appCategory="productivity"
+        android:enableOnBackInvokedCallback="true"
+        tools:targetApi="36">
+
+        <activity
+            android:name=".EditorActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:resizeableActivity="true"
+            android:windowSoftInputMode="adjustResize|stateHidden"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Open with / Edit with, by MIME type -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.EDIT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="text/*" />
+                <data android:mimeType="application/json" />
+                <data android:mimeType="application/xml" />
+                <data android:mimeType="application/x-ini" />
+                <data android:mimeType="application/x-yaml" />
+            </intent-filter>
+
+            <!-- Open with / Edit with, by extension, for senders that report
+                 application/octet-stream or another unhelpful type.
+                 pathPattern is matched against the decoded path; the extra
+                 ".*\\..*\\." variants work around Android's non-greedy matcher
+                 when earlier path segments contain dots. pathSuffix (API 31+)
+                 is added alongside and ignored on older versions. -->
+            <intent-filter tools:ignore="AppLinkUrlError">
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.EDIT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.txt" />
+                <data android:pathPattern=".*\\..*\\.txt" />
+                <data android:pathPattern=".*\\..*\\..*\\.txt" />
+                <data android:pathSuffix=".txt" />
+                <data android:pathPattern=".*\\.log" />
+                <data android:pathPattern=".*\\..*\\.log" />
+                <data android:pathPattern=".*\\..*\\..*\\.log" />
+                <data android:pathSuffix=".log" />
+                <data android:pathPattern=".*\\.ini" />
+                <data android:pathPattern=".*\\..*\\.ini" />
+                <data android:pathPattern=".*\\..*\\..*\\.ini" />
+                <data android:pathSuffix=".ini" />
+                <data android:pathPattern=".*\\.md" />
+                <data android:pathPattern=".*\\..*\\.md" />
+                <data android:pathPattern=".*\\..*\\..*\\.md" />
+                <data android:pathSuffix=".md" />
+                <data android:pathPattern=".*\\.json" />
+                <data android:pathPattern=".*\\..*\\.json" />
+                <data android:pathPattern=".*\\..*\\..*\\.json" />
+                <data android:pathSuffix=".json" />
+                <data android:pathPattern=".*\\.csv" />
+                <data android:pathPattern=".*\\..*\\.csv" />
+                <data android:pathPattern=".*\\..*\\..*\\.csv" />
+                <data android:pathSuffix=".csv" />
+                <data android:pathPattern=".*\\.cfg" />
+                <data android:pathPattern=".*\\..*\\.cfg" />
+                <data android:pathPattern=".*\\..*\\..*\\.cfg" />
+                <data android:pathSuffix=".cfg" />
+            </intent-filter>
+
+            <!-- Shared text or a shared text file -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
