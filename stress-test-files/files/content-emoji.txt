@@ -1,0 +1,12 @@
+Single code point: 😀 🎉 🚀 ❤ ✅
+With variation selector (U+FE0F): ❤️ ☺️ ✔️
+Skin tones: 👍 👍🏻 👍🏼 👍🏽 👍🏾 👍🏿
+ZWJ family: 👨‍👩‍👧 👨‍👩‍👧‍👦 👩‍👩‍👦
+ZWJ with skin tone: 🧑🏽‍💻 👩🏿‍🚀 🤝🏻
+ZWJ professions: 👩‍⚕️ 👨‍🍳 🧑‍🔬
+Flags (regional indicator pairs): 🇮🇳 🇺🇸 🇯🇵 🇩🇪 🇧🇷
+Keycaps: 1️⃣ 2️⃣ #️⃣
+Rainbow flag: 🏳️‍🌈
+Emoji between letters: a😀b👨‍👩‍👧c👍🏽d
+Line of 40 family emoji: 👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧👨‍👩‍👧
+Surrogate pairs next to a caret stop: x😀x😀x😀x

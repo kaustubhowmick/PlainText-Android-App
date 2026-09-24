@@ -1,0 +1,23 @@
+Line 1 ends with CRLF
+Line 2 ends with LF
+Line 3 ends with CRLine 4 ends with CRLF
+Line 5 ends with LF
+Line 6 ends with CRLine 7 ends with CRLF
+Line 8 ends with LF
+Line 9 ends with CRLine 10 ends with CRLF
+Line 11 ends with LF
+Line 12 ends with CRLine 13 ends with CRLF
+Line 14 ends with LF
+Line 15 ends with CRLine 16 ends with CRLF
+Line 17 ends with LF
+Line 18 ends with CRLine 19 ends with CRLF
+Line 20 ends with LF
+Line 21 ends with CRLine 22 ends with CRLF
+Line 23 ends with LF
+Line 24 ends with CRLine 25 ends with CRLF
+Line 26 ends with LF
+Line 27 ends with CRLine 28 ends with CRLF
+Line 29 ends with LF
+Line 30 ends with CREdge case: CR CR LF (counts as CR + CRLF)
+Edge case: LF CR (counts as LF + CR)
+Last line has no line break

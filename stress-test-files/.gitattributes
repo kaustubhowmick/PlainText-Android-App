@@ -1,0 +1,2 @@
+# Keep every stress-test file byte-exact: no line-ending or encoding conversion.
+files/** -text
