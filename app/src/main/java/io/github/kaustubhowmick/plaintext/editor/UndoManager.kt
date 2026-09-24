@@ -62,7 +62,8 @@ class UndoManager(private val clock: () -> Long = System::currentTimeMillis) {
      * [composing] is true while the IME has an active composing region.
      */
     fun record(start: Int, removed: String, inserted: String, caretBefore: Int, composing: Boolean) {
-        if (isApplying || (removed.isEmpty() && inserted.isEmpty())) return
+        // A no-op replace (e.g. an edit rejected by the view-only input filter) is not an edit.
+        if (isApplying || removed == inserted) return
         val now = clock()
         redoStack.forEach { storedChars -= it.chars }
         redoStack.clear()

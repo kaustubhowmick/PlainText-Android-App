@@ -144,4 +144,12 @@ class UndoManagerTest {
         assertEquals(UndoManager.MAX_GROUPS, steps)
         assertTrue("oldest edits can no longer be undone, so the text differs from the clean state", undo.isDirty)
     }
+
+    @Test
+    fun noOpReplaceIsNotAnEdit() {
+        undo.reset()
+        undo.record(0, "abc", "abc", 0, composing = false)
+        assertFalse(undo.isDirty)
+        assertFalse(undo.canUndo)
+    }
 }

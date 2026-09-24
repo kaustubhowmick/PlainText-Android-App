@@ -377,6 +377,7 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
         session.clearSnapshot()
         editor.applyTabStops()
         editor.viewOnly = doc.access.isViewOnly
+        editor.post { fastScroller.sync() }
     }
 
     /** Shows [text] as a freshly loaded document described by [newDoc]. */
@@ -405,9 +406,7 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
         scheduleStatus()
     }
 
-    override fun onScrolled() {
-        if (fastScroller.visibility == View.VISIBLE) fastScroller.invalidate()
-    }
+    override fun onScrolled() = fastScroller.sync()
 
     override fun onBeforeClipboardEdit() {
         session.undo.breakGroup()
@@ -775,7 +774,10 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
     )
 
     private fun save() {
-        if (session.busy) return
+        if (session.busy) {
+            onSaveFinished(false)
+            return
+        }
         val d = doc
         when {
             d.access.isViewOnly -> onSaveFinished(false)
