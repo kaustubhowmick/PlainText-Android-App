@@ -37,4 +37,86 @@
 
     <string name="saved">Saved</string>
     <string name="no_changes">No changes to save</string>
+    <!-- File menu (phase 3) -->
+    <string name="open">Open…</string>
+    <string name="open_short">Open</string>
+    <string name="recent">Recent</string>
+    <string name="clear_recent">Clear recent files</string>
+    <string name="save_as">Save As…</string>
+    <string name="reopen_with_encoding">Reopen with Encoding</string>
+    <string name="default_folder">Default Folder…</string>
+
+    <!-- First run and default folder (design.md §6.9, §5.23) -->
+    <string name="first_run_title">Choose a folder for your notes</string>
+    <string name="first_run_message">PlainText saves notes as ordinary .txt files. Pick a folder once — for example Documents/Notes — and new notes will be saved there. You can see them in any file manager or copy them to a computer.\n\nTip: use "New folder" in the next screen to create a Notes folder. Android doesn\'t allow the Download folder or the storage root.\n\nYou can still open and save files anywhere with Open and Save As.</string>
+    <string name="not_now">Not now</string>
+    <string name="choose_folder">Choose folder</string>
+    <string name="notes_saved_in">Notes will be saved in %1$s</string>
+    <string name="no_tree_picker">This device doesn\'t support choosing a folder. Use Save As instead.</string>
+    <string name="default_folder_is">New notes are saved in: %1$s</string>
+    <string name="default_folder_none">No default folder chosen. New notes are saved with Save As.</string>
+    <string name="change">Change…</string>
+    <string name="clear">Clear</string>
+    <string name="close">Close</string>
+    <string name="folder_unavailable">Your notes folder is no longer available. It may have been deleted, renamed, or on a removed SD card.</string>
+
+    <!-- Save options (design.md §6.7) -->
+    <string name="folder_label">Folder: %1$s</string>
+    <string name="file_name">File name:</string>
+    <string name="encoding_label">Encoding:</string>
+    <string name="line_ending_label">Line ending:</string>
+    <string name="use_for_new_files">Use for new files</string>
+    <string name="choose_location_next">You\'ll choose the name and location next.</string>
+    <string name="other_location">Other location…</string>
+    <string name="choose_location">Choose location…</string>
+    <string name="invalid_name_chars">A file name can\'t contain any of these characters: \\ / : * ? " &lt; &gt; |</string>
+    <string name="empty_name">Type a file name.</string>
+    <string name="already_exists_title">%1$s already exists.</string>
+    <string name="replace_it">Do you want to replace it?</string>
+    <string name="replace">Replace</string>
+    <string name="keep_both">Keep both</string>
+    <string name="saved_as">Saved as %1$s</string>
+
+    <!-- Save problems (design.md §4.7, §5.24, §5.25, §8) -->
+    <string name="cant_save_here_title">%1$s can\'t be saved here.</string>
+    <string name="cant_save_here">The app that provided this file doesn\'t allow changes. Save a copy somewhere else?</string>
+    <string name="unmappable_title">Some characters can\'t be saved as ANSI.</string>
+    <string name="unmappable_message">This file contains characters, such as "%1$s", that ANSI can\'t store. If you save as ANSI they will be replaced with "?".</string>
+    <string name="save_as_utf8">Save as UTF-8</string>
+    <string name="save_as_ansi_anyway">Save as ANSI anyway</string>
+    <string name="mixed_title">Mixed line endings</string>
+    <string name="mixed_message">%1$s uses mixed line endings (CRLF: %2$d, LF: %3$d, CR: %4$d). Saving will convert all of them to:</string>
+    <string name="mixed_on_open">This file has mixed line endings.</string>
+    <string name="changed_since_open_title">%1$s has changed since you opened it.</string>
+    <string name="changed_since_open">Saving will overwrite the other app\'s changes.</string>
+    <string name="overwrite">Overwrite</string>
+    <string name="permission_lost">PlainText no longer has permission to access %1$s.</string>
+    <string name="storage_full">There isn\'t enough space to save %1$s. The file on the device may be incomplete. Your text is safe here — free up space and save again, or save somewhere else.</string>
+    <string name="write_failed">Couldn\'t save %1$s. Your text is safe here — try again or save somewhere else.</string>
+    <string name="try_again">Try again</string>
+    <string name="maybe_leftover">%1$s was saved, but the app that stores it may have left old text at the end. Use Save As to make a clean copy.</string>
+    <string name="no_picker">This device doesn\'t have a file picker, so PlainText can\'t open or save files here.</string>
+
+    <!-- Open problems (design.md §5.31, §5.32, §8) -->
+    <string name="cant_open">Can\'t open %1$s. It may have been moved or deleted, or access was removed.</string>
+    <string name="cant_read_from_app">PlainText can\'t read this file from that app. Use File ▸ Open instead.</string>
+    <string name="too_large_to_open">%1$s is too large to open on this device.</string>
+    <string name="too_large_title">File too large</string>
+    <string name="too_large_message">%1$s is %2$s. PlainText can edit files up to 10 MB.</string>
+    <string name="open_preview">Open preview (read-only)</string>
+    <string name="binary_title">This doesn\'t look like a text file.</string>
+    <string name="binary_message">%1$s contains data that isn\'t text. Editing and saving it would damage it.</string>
+    <string name="open_read_only">Open read-only</string>
+    <string name="invalid_encoding">This file isn\'t valid %1$s.</string>
+    <string name="large_file">Large file — some actions may be slower.</string>
+    <string name="long_lines">This file has very long lines; editing may be slow.</string>
+
+    <!-- External changes (design.md §5.33) -->
+    <string name="reloaded">%1$s was changed by another app and has been reloaded.</string>
+    <string name="changed_externally_title">%1$s was changed by another app.</string>
+    <string name="changed_externally">Do you want to reload it? Your unsaved changes will be lost.</string>
+    <string name="reload">Reload</string>
+    <string name="keep_mine">Keep my version</string>
+    <string name="deleted_externally">%1$s no longer exists. Your text is still here — save to keep it.</string>
 </resources>
+

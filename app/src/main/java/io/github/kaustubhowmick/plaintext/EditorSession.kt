@@ -47,6 +47,12 @@ class EditorSession(var doc: Document) {
     var saveAsEncoding: Encoding? = null
     var saveAsLineEnding: LineEnding? = null
 
+    /** Why the folder picker was launched, so its result continues the right flow. */
+    var treePurpose: TreePurpose = TreePurpose.SETTINGS
+
+    /** Line-ending counts of a mixed file, for the confirmation on first save. */
+    var mixedCounts: IntArray? = null
+
     /** Suggested file name for shared text (EXTRA_SUBJECT). */
     var proposedName: String? = null
 
@@ -75,6 +81,8 @@ class EditorSession(var doc: Document) {
     }
 }
 
+enum class TreePurpose { FIRST_RUN, SETTINGS, SAVE }
+
 /** An action deferred behind the unsaved-changes prompt (design.md §5.9). */
 class PendingAction(
     val kind: Kind,
@@ -82,7 +90,7 @@ class PendingAction(
     val intent: Intent? = null,
     val extra: String? = null,
 ) {
-    enum class Kind { NEW, OPEN_PICKER, OPEN_URI, HANDLE_INTENT, EXIT, REOPEN_WITH }
+    enum class Kind { NEW, OPEN_PICKER, OPEN_URI, SHARE_TEXT, EXIT, REOPEN_WITH }
 
     fun toBundle() = Bundle().apply {
         putString("kind", kind.name)

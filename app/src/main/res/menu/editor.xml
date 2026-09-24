@@ -12,14 +12,50 @@
         android:title="@string/save" />
 
     <item
+        android:id="@+id/action_redo"
+        android:icon="@drawable/ic_redo"
+        android:showAsAction="ifRoom"
+        android:title="@string/redo"
+        android:visible="false" />
+    <item
+        android:id="@+id/action_new"
+        android:icon="@drawable/ic_new"
+        android:showAsAction="ifRoom"
+        android:title="@string/new_document"
+        android:visible="false" />
+    <item
+        android:id="@+id/action_open"
+        android:icon="@drawable/ic_open"
+        android:showAsAction="ifRoom"
+        android:title="@string/open_short"
+        android:visible="false" />
+
+    <item
         android:id="@+id/menu_file"
         android:showAsAction="never"
         android:title="@string/menu_file">
         <menu>
             <item android:id="@+id/file_new" android:title="@string/new_document"
                 android:alphabeticShortcut="n" android:alphabeticModifiers="CTRL" />
+            <item android:id="@+id/file_open" android:title="@string/open"
+                android:alphabeticShortcut="o" android:alphabeticModifiers="CTRL" />
+            <item android:id="@+id/file_recent" android:title="@string/recent">
+                <menu />
+            </item>
             <item android:id="@+id/file_save" android:title="@string/save"
                 android:alphabeticShortcut="s" android:alphabeticModifiers="CTRL" />
+            <item android:id="@+id/file_save_as" android:title="@string/save_as"
+                android:alphabeticShortcut="s" android:alphabeticModifiers="CTRL|SHIFT" />
+            <item android:id="@+id/file_reopen" android:title="@string/reopen_with_encoding">
+                <menu>
+                    <item android:id="@+id/reopen_utf8" android:title="UTF-8" />
+                    <item android:id="@+id/reopen_utf8_bom" android:title="UTF-8 with BOM" />
+                    <item android:id="@+id/reopen_utf16le" android:title="UTF-16 LE" />
+                    <item android:id="@+id/reopen_utf16be" android:title="UTF-16 BE" />
+                    <item android:id="@+id/reopen_ansi" android:title="ANSI" />
+                </menu>
+            </item>
+            <item android:id="@+id/file_default_folder" android:title="@string/default_folder" />
             <item android:id="@+id/file_exit" android:title="@string/exit" />
         </menu>
     </item>
