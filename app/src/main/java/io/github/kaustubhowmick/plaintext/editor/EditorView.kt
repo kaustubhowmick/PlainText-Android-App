@@ -12,7 +12,7 @@ import android.view.ScaleGestureDetector
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
-import android.view.inputmethod.InputConnectionWrapper
+import android.view.inputmethod.InputMethodManager
 import android.view.textclassifier.TextClassifier
 import android.widget.EditText
 import io.github.kaustubhowmick.plaintext.R
@@ -51,12 +51,18 @@ class EditorView @JvmOverloads constructor(
 
     var listener: Listener? = null
 
-    /** When true the text can be selected and copied but not changed. */
+    /**
+     * When true the text can be selected and copied but not changed. A
+     * view-only document has no IME connection, so the keyboard app never
+     * reads or edits it.
+     */
     var viewOnly = false
         set(value) {
+            val changed = field != value
             field = value
             filters = if (value) arrayOf(REJECT_ALL) else emptyArray()
             showSoftInputOnFocus = !value
+            if (changed) context.getSystemService(InputMethodManager::class.java)?.restartInput(this)
         }
 
     /** True while the view takes its text out and puts it back to rebuild the layout; not an edit. */
@@ -183,11 +189,18 @@ class EditorView @JvmOverloads constructor(
         post { bringPointIntoView(selectionEnd) }
     }
 
-    /** Mirrors TextView.onMeasure: no layout yet, or a new wrapping width. */
+    /**
+     * Mirrors TextView.onMeasure: no layout yet, or a layout width or
+     * ellipsized width that differs from the new one. Without word wrap the
+     * layout is VERY_WIDE and its ellipsized width is too, so TextView rebuilds
+     * it at every measure. When unsure, say yes: slicing is only slower.
+     */
     private fun layoutWillBeRebuilt(widthMeasureSpec: Int): Boolean {
         val l = layout ?: return true
-        if (horizontallyScrolling || MeasureSpec.getMode(widthMeasureSpec) != MeasureSpec.EXACTLY) return false
-        return l.width != MeasureSpec.getSize(widthMeasureSpec) - compoundPaddingLeft - compoundPaddingRight
+        if (MeasureSpec.getMode(widthMeasureSpec) != MeasureSpec.EXACTLY) return true
+        val width = MeasureSpec.getSize(widthMeasureSpec) - compoundPaddingLeft - compoundPaddingRight
+        val want = if (horizontallyScrolling) VERY_WIDE else width
+        return l.width != want || l.ellipsizedWidth != width
     }
 
     override fun onSelectionChanged(selStart: Int, selEnd: Int) {
@@ -212,7 +225,7 @@ class EditorView @JvmOverloads constructor(
     /**
      * A view-only document rejects edits with an input filter, but the rejected
      * replace still makes the layout re-measure the line: seconds per key in a
-     * multi-MB line. So typing keys and IME commits are dropped before that.
+     * multi-MB line. So typing keys are dropped before that.
      */
     private fun changesText(keyCode: Int, event: KeyEvent): Boolean =
         !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed &&
@@ -224,25 +237,10 @@ class EditorView @JvmOverloads constructor(
         return super.onKeyMultiple(keyCode, repeatCount, event)
     }
 
-    override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
-        val ic = super.onCreateInputConnection(outAttrs) ?: return null
-        return object : InputConnectionWrapper(ic, false) {
-            override fun commitText(text: CharSequence?, newCursorPosition: Int) =
-                viewOnly || super.commitText(text, newCursorPosition)
+    override fun onCheckIsTextEditor() = !viewOnly && super.onCheckIsTextEditor()
 
-            override fun setComposingText(text: CharSequence?, newCursorPosition: Int) =
-                viewOnly || super.setComposingText(text, newCursorPosition)
-
-            override fun deleteSurroundingText(beforeLength: Int, afterLength: Int) =
-                viewOnly || super.deleteSurroundingText(beforeLength, afterLength)
-
-            override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int) =
-                viewOnly || super.deleteSurroundingTextInCodePoints(beforeLength, afterLength)
-
-            override fun sendKeyEvent(event: KeyEvent): Boolean =
-                (viewOnly && changesText(event.keyCode, event)) || super.sendKeyEvent(event)
-        }
-    }
+    override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? =
+        if (viewOnly) null else super.onCreateInputConnection(outAttrs)
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (viewOnly && changesText(keyCode, event)) return true
@@ -299,6 +297,9 @@ class EditorView @JvmOverloads constructor(
         /** A slice ends after this many lines, or after the line that reaches [SLICE_CHARS]. */
         const val SLICE_LINES = 20_000
         const val SLICE_CHARS = 1_000_000
+
+        /** TextView's layout width without word wrap. */
+        private const val VERY_WIDE = 1024 * 1024
 
         /** Keeps the destination unchanged: used for view-only documents. */
         private val REJECT_ALL = InputFilter { _, _, _, dest, dstart, dend -> dest.subSequence(dstart, dend) }
