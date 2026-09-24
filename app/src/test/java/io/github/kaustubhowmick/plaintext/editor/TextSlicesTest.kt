@@ -7,11 +7,11 @@ import org.junit.Test
 
 class TextSlicesTest {
 
-    private fun slices(text: String, maxLines: Int): List<String> {
+    private fun slices(text: String, maxLines: Int, maxChars: Int = Int.MAX_VALUE): List<String> {
         val out = mutableListOf<String>()
         var start = 0
         while (start < text.length) {
-            val end = TextSlices.end(text, start, maxLines)
+            val end = TextSlices.end(text, start, maxLines, maxChars)
             out.add(text.substring(start, end))
             start = end
         }
@@ -33,6 +33,12 @@ class TextSlicesTest {
     }
 
     @Test
+    fun charLimitEndsAfterTheLineThatReachesIt() {
+        assertEquals(listOf("abc\n", "de\n", "f\ngh"), slices("abc\nde\nf\ngh", 100, 3))
+        assertEquals(listOf("abcdef\n", "g"), slices("abcdef\ng", 100, 2))
+    }
+
+    @Test
     fun slicesJoinBackToTheText() {
         val text = (0 until 1000).joinToString("\n") { "line $it" }
         val parts = slices(text, 64)
@@ -43,7 +49,7 @@ class TextSlicesTest {
 
     @Test
     fun emptyText() {
-        assertEquals(0, TextSlices.end("", 0, 10))
+        assertEquals(0, TextSlices.end("", 0, 10, 10))
         assertFalse(TextSlices.hasMoreLinesThan("", 0))
     }
 

@@ -6,16 +6,17 @@ package io.github.kaustubhowmick.plaintext.editor
  */
 object TextSlices {
     /**
-     * The end of the slice starting at [start]: just after the [maxLines]-th
-     * '\n', or the end of the text. A slice never ends inside a line, so no
-     * paragraph is laid out twice.
+     * The end of the slice starting at [start]: just after the '\n' that ends
+     * its [maxLines]-th line or the first line reaching [maxChars], or the end
+     * of the text. A slice never ends inside a line, so no paragraph is laid
+     * out twice.
      */
-    fun end(text: CharSequence, start: Int, maxLines: Int): Int {
+    fun end(text: CharSequence, start: Int, maxLines: Int, maxChars: Int): Int {
         var lines = 0
         var i = start
         val n = text.length
         while (i < n) {
-            if (text[i++] == '\n' && ++lines == maxLines) break
+            if (text[i++] == '\n' && (++lines == maxLines || i - start >= maxChars)) break
         }
         return i
     }

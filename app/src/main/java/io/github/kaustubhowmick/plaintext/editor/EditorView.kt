@@ -10,6 +10,9 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
+import android.view.inputmethod.InputConnectionWrapper
 import android.view.textclassifier.TextClassifier
 import android.widget.EditText
 import io.github.kaustubhowmick.plaintext.R
@@ -24,8 +27,12 @@ import io.github.kaustubhowmick.plaintext.R
  * ends. For a few hundred thousand lines that runs out of memory (a
  * 500,000-line file crashed on open). So whole-text changes and layout rebuilds
  * go through [setTextInSlices], [replaceInSlices], and [onMeasure], which add
- * the text [SLICE_LINES] lines at a time: each pass stays small and the
- * finished layout is the same.
+ * the text a slice at a time: each pass stays small and the finished layout is
+ * the same.
+ *
+ * Each inserted slice also becomes one block of the layout, and drawing or
+ * editing re-records a whole block. Slices are therefore small (about a
+ * screenful), like the blocks Android makes when it lays out text in one go.
  */
 class EditorView @JvmOverloads constructor(
     context: Context,
@@ -107,7 +114,7 @@ class EditorView @JvmOverloads constructor(
     /** `text.replace(start, end, content)`, inserting a big [content] in slices. */
     fun replaceInSlices(start: Int, end: Int, content: CharSequence) {
         val t = text
-        if (!TextSlices.hasMoreLinesThan(content, SLICE_LINES)) {
+        if (!TextSlices.hasMoreLinesThan(content, MANY_LINES)) {
             t.replace(start, end, content)
             return
         }
@@ -118,11 +125,16 @@ class EditorView @JvmOverloads constructor(
     }
 
     private fun insertSlices(t: Editable, at: Int, content: CharSequence) {
-        var from = 0
-        while (from < content.length) {
-            val to = TextSlices.end(content, from, SLICE_LINES)
-            t.insert(at + from, content, from, to)
-            from = to
+        beginBatchEdit() // one caret/IME update at the end instead of one per slice
+        try {
+            var from = 0
+            while (from < content.length) {
+                val to = TextSlices.end(content, from, SLICE_LINES, SLICE_CHARS)
+                t.insert(at + from, content, from, to)
+                from = to
+            }
+        } finally {
+            endBatchEdit()
         }
     }
 
@@ -149,7 +161,7 @@ class EditorView @JvmOverloads constructor(
      */
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val t = text
-        if (isSwappingText || !layoutWillBeRebuilt(widthMeasureSpec) || !TextSlices.hasMoreLinesThan(t, SLICE_LINES)) {
+        if (isSwappingText || !layoutWillBeRebuilt(widthMeasureSpec) || !TextSlices.hasMoreLinesThan(t, MANY_LINES)) {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
             return
         }
@@ -194,7 +206,43 @@ class EditorView @JvmOverloads constructor(
         return super.onTextContextMenuItem(if (id == android.R.id.paste) android.R.id.pasteAsPlainText else id)
     }
 
+    /**
+     * A view-only document rejects edits with an input filter, but the rejected
+     * replace still makes the layout re-measure the line: seconds per key in a
+     * multi-MB line. So typing keys and IME commits are dropped before that.
+     */
+    private fun changesText(keyCode: Int, event: KeyEvent): Boolean =
+        !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed &&
+            (event.isPrintingKey || keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_DEL ||
+                keyCode == KeyEvent.KEYCODE_FORWARD_DEL || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER)
+
+    override fun onKeyMultiple(keyCode: Int, repeatCount: Int, event: KeyEvent): Boolean {
+        if (viewOnly && (keyCode == KeyEvent.KEYCODE_UNKNOWN || changesText(keyCode, event))) return true
+        return super.onKeyMultiple(keyCode, repeatCount, event)
+    }
+
+    override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
+        val ic = super.onCreateInputConnection(outAttrs) ?: return null
+        return object : InputConnectionWrapper(ic, false) {
+            override fun commitText(text: CharSequence?, newCursorPosition: Int) =
+                viewOnly || super.commitText(text, newCursorPosition)
+
+            override fun setComposingText(text: CharSequence?, newCursorPosition: Int) =
+                viewOnly || super.setComposingText(text, newCursorPosition)
+
+            override fun deleteSurroundingText(beforeLength: Int, afterLength: Int) =
+                viewOnly || super.deleteSurroundingText(beforeLength, afterLength)
+
+            override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int) =
+                viewOnly || super.deleteSurroundingTextInCodePoints(beforeLength, afterLength)
+
+            override fun sendKeyEvent(event: KeyEvent): Boolean =
+                (viewOnly && changesText(event.keyCode, event)) || super.sendKeyEvent(event)
+        }
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (viewOnly && changesText(keyCode, event)) return true
         if (keyCode == KeyEvent.KEYCODE_TAB && !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed) {
             if (!event.isShiftPressed && !viewOnly) {
                 val t = text
@@ -239,8 +287,12 @@ class EditorView @JvmOverloads constructor(
     }
 
     companion object {
-        /** Lines per slice: small enough that one layout pass stays a few MB. */
-        const val SLICE_LINES = 10_000
+        /** More lines than this, and a relayout of all the text goes through slices. */
+        const val MANY_LINES = 10_000
+
+        /** A slice ends after this many lines, or after the line that reaches [SLICE_CHARS]. */
+        const val SLICE_LINES = 100
+        const val SLICE_CHARS = 4_000
 
         /** Keeps the destination unchanged: used for view-only documents. */
         private val REJECT_ALL = InputFilter { _, _, _, dest, dstart, dend -> dest.subSequence(dstart, dend) }

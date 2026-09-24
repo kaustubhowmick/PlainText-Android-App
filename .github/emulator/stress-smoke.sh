@@ -69,6 +69,7 @@ report() { # label seconds
   if [ "$status" != alive ]; then
     echo "----- $label -----"
     grep -E -A30 'FATAL EXCEPTION|ANR in|OutOfMemory|StackOverflow' "$f" | head -60
+    grep -E "Fatal signal|lowmemorykiller|lmkd|has died|Killing .*plaintext|Force stopping|backtrace:|#0[0-9] pc" "$f" | head -30
     echo "------------------"
   fi
 }

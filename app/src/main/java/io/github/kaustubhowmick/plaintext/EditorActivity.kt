@@ -13,6 +13,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Process
+import android.os.SystemClock
 import android.provider.DocumentsContract
 import android.system.ErrnoException
 import android.system.OsConstants
@@ -191,6 +192,7 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
         session.work.main.removeCallbacks(recoveryRunnable)
         session.work.main.removeCallbacks(showProgressRunnable)
         session.work.main.removeCallbacks(applyZoomRunnable)
+        session.work.main.removeCallbacksAndMessages(RELAYOUT_TOKEN)
         if (isFinishing) session.work.shutdown()
         super.onDestroy()
     }
@@ -1980,19 +1982,31 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
      * to notice: many characters, many lines, or one very long line.
      */
     private fun isLargeDocument() =
-        editor.length() > LARGE_FILE_CHARS || session.lines.lineCount > EditorView.SLICE_LINES
+        editor.length() > LARGE_FILE_CHARS || session.lines.lineCount > EditorView.MANY_LINES
 
-    /** Says a relayout is coming; toasts are drawn by the system, so this one shows while the app is busy. */
-    private fun warnIfSlowRelayout() {
-        if (isLargeDocument()) toast(getString(R.string.reformatting))
+    /**
+     * Runs [change], which re-lays out the whole text. For a large document
+     * that blocks the app for seconds, so first a toast says so (toasts are
+     * drawn by the system and stay visible), and the change runs a moment later,
+     * after the tap or menu that asked for it has finished: an input event left
+     * waiting for 5 seconds makes Android report the app as not responding.
+     */
+    private fun relayout(change: () -> Unit) {
+        if (!isLargeDocument()) {
+            change()
+            return
+        }
+        toast(getString(R.string.reformatting))
+        session.work.main.postAtTime(Runnable(change), RELAYOUT_TOKEN, SystemClock.uptimeMillis() + RELAYOUT_DELAY_MS)
     }
 
     private fun toggleWordWrap() {
         settings.wordWrap = !settings.wordWrap
-        warnIfSlowRelayout()
-        applyWordWrap()
-        if (settings.wordWrap) editor.scrollTo(0, editor.scrollY)
-        editor.post { editor.bringPointIntoView(editor.selectionEnd) }
+        relayout {
+            applyWordWrap()
+            if (settings.wordWrap) editor.scrollTo(0, editor.scrollY)
+            editor.post { editor.bringPointIntoView(editor.selectionEnd) }
+        }
     }
 
     private fun zoomBy(delta: Int) = setZoom(settings.zoomPercent + delta)
@@ -2010,9 +2024,10 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
     }
 
     private val applyZoomRunnable = Runnable {
-        warnIfSlowRelayout()
-        applyFont()
-        editor.post { editor.bringPointIntoView(editor.selectionEnd) }
+        relayout {
+            applyFont()
+            editor.post { editor.bringPointIntoView(editor.selectionEnd) }
+        }
     }
 
     private fun showFontDialog() {
@@ -2023,8 +2038,7 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
             settings.fontFamily = c.family
             settings.fontStyle = c.style
             settings.fontSizeSp = c.sizeSp
-            warnIfSlowRelayout()
-            applyFont()
+            relayout { applyFont() }
         }
     }
 
@@ -2110,6 +2124,8 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
         const val NARROW_DP = 360
         const val ZOOM_STEP = 10
         const val ZOOM_SETTLE_MS = 400L
+        const val RELAYOUT_DELAY_MS = 250L
+        val RELAYOUT_TOKEN = Any()
         /** Longer lines open read-only unless the user chooses to edit (see OpenResult.LongLines). */
         const val LONG_LINE_EDIT_CHARS = 500_000
         const val MAX_PREFILL = 200
