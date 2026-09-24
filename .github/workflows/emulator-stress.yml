@@ -1,8 +1,7 @@
 name: Emulator stress run
 
+# About 20 minutes per run, so it runs on demand: Actions > Emulator stress run > Run workflow.
 on:
-  push:
-    branches: [claude/modest-gauss-z4d1oe]
   workflow_dispatch:
 
 permissions:

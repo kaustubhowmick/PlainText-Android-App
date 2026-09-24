@@ -9,7 +9,7 @@ cd stress-test-files && sha256sum -c checksums.txt     # verify
 
 The generator is deterministic, so a fresh run matches the committed `checksums.txt`. The three largest files (`normal-10MB.txt`, `normal-50MB.txt`, `single-line-5MB.txt`) are git-ignored to keep the repository small. Run the script to create them, or download the **stress-test-files** artifact from any **Build** run in the Actions tab. That artifact has every file plus `checksums.txt`.
 
-The **Emulator stress run** workflow (Actions tab) opens these files on an Android emulator and logs crashes, "not responding" errors, and how long each step takes. The script is `.github/emulator/stress-smoke.sh`.
+The **Emulator stress run** workflow (Actions tab, **Run workflow**) opens these files on an Android emulator and logs crashes, "not responding" errors, and how long each step takes. The script is `.github/emulator/stress-smoke.sh`.
 
 To get the files onto a phone: `adb push stress-test-files/files /sdcard/Download/stress-test-files`
 
