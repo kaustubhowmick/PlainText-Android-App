@@ -1,5 +1,6 @@
 package io.github.kaustubhowmick.plaintext.print
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Paint
@@ -106,7 +107,11 @@ class TextPrintAdapter(
         .setPageCount(maxOf(1, pageStarts.size - 1))
         .build()
 
-    /** Runs on the worker thread. Returns false if cancelled. */
+    /**
+     * Runs on the worker thread. Returns false if cancelled. The Layout.* break and
+     * hyphenation constants equal the LineBreaker ones lint asks for, which need API 29.
+     */
+    @SuppressLint("WrongConstant")
     private fun paginate(attrs: PrintAttributes, cancel: CancellationSignal): Boolean {
         val media = attrs.mediaSize ?: PrintAttributes.MediaSize.ISO_A4
         val pageWidth = media.widthMils * 72f / 1000f

@@ -31,3 +31,8 @@
 - **Edge-to-edge before Android 11.** §6.13 pads for system-bar insets on API 26–29 as well. There, the app lets the system fit the window instead, with theme-colored status and navigation bars and light/dark icons from the theme. The visual result is the same, and it avoids deprecated `SYSTEM_UI_FLAG` layout flags.
 - **About text.** §5.21 asks for the license name, but the repository has no license file yet, so the About box doesn't name one. Add the license name to `about_text` once one is chosen.
 - **F3/F5 in menus.** Framework menus can only display letter shortcuts with modifiers, so F3, Shift+F3, and F5 are not shown next to their menu items. They work, and they are listed in Help ▸ Keyboard Shortcuts and in the system shortcut helper (Meta+/).
+
+## Tests
+
+- **Scope.** The JVM unit tests cover everything in §10.1 that runs without Android: encoding and line-ending round-trips, Windows-1252, encoding detection, `.LOG`, undo coalescing and save points, the line index (randomized against brute force), search and Replace All, header/footer codes, and file names. `RecentFiles` isn't unit-tested because it uses `org.json`, which is only a stub in local unit tests; testing it would need Robolectric or an instrumented test. The instrumented SAF, intent, and lifecycle tests in §10.2 are not written yet.
+- **Lint suppressions.** Two framework-only patterns trip lint checks written for AndroidX apps: `onBackPressed` (used only on API 26–32; API 33+ uses `OnBackInvokedCallback`) and `Layout.BREAK_STRATEGY_SIMPLE` (same value as the API 29 `LineBreaker` constant). Both are suppressed at the call site with a comment.
