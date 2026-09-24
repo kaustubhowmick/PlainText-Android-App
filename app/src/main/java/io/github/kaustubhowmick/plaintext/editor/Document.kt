@@ -10,9 +10,10 @@ enum class AccessMode {
     READ_WRITE,        // normal
     READ_ONLY_FILE,    // provider or grant disallows writing; user may edit, Save routes to Save As
     VIEW_ONLY_BINARY,  // binary file opened read-only; editing disabled, Save/Save As disabled
-    VIEW_ONLY_PREVIEW; // first 10 MB of an oversized file; editing disabled, Save/Save As disabled
+    VIEW_ONLY_PREVIEW, // first 10 MB of an oversized file; editing disabled, Save/Save As disabled
+    VIEW_ONLY_LONG_LINES; // a line too long to edit smoothly, opened read-only by choice; like VIEW_ONLY_BINARY
 
-    val isViewOnly: Boolean get() = this == VIEW_ONLY_BINARY || this == VIEW_ONLY_PREVIEW
+    val isViewOnly: Boolean get() = this == VIEW_ONLY_BINARY || this == VIEW_ONLY_PREVIEW || this == VIEW_ONLY_LONG_LINES
 }
 
 /** Size and last-modified time at last open/save; null = provider did not report it. */

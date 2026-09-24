@@ -92,41 +92,82 @@ for f in "$SRC"/*; do
   put "$f" "$dev"
 done
 
+# Taps the first on-screen element whose text or content-desc equals $1.
+tap() {
+  timeout 15 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  local b
+  b=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -E "(text|content-desc)=\"$1\"" | head -1 \
+      | sed -n 's/.*bounds="\[\([0-9]*\),\([0-9]*\)\]\[\([0-9]*\),\([0-9]*\)\]".*/\1 \2 \3 \4/p')
+  if [ -z "$b" ]; then echo "  (no \"$1\" on screen)"; return 1; fi
+  read -r x1 y1 x2 y2 <<< "$b"
+  adb shell input tap $(((x1 + x2) / 2)) $(((y1 + y2) / 2))
+}
+
+# Opens $1 and waits for its name in the title.
+opened() { # device-name wrap
+  fresh "$2" 100; launch "$1"; wait_for "$1" >/dev/null; adb logcat -c
+}
+
+N500K=${NAME[500000-short-lines.txt]}
+N10M=${NAME[normal-10MB.txt]}
+N1M=${NAME[normal-1MB.txt]}
+N5M=${NAME[single-line-5MB.txt]}
+
 echo "== open, word wrap on =="
-for base in encoding-utf8.txt normal-1MB.txt normal-10MB.txt normal-50MB.txt single-line-5MB.txt \
-  500000-short-lines.txt content-long-words.txt binary-png-renamed.txt; do
+for base in encoding-utf8.txt normal-1MB.txt normal-10MB.txt normal-50MB.txt \
+  500000-short-lines.txt content-long-words.txt binary-png-renamed.txt content-tabs.txt; do
   open_case "open/$base" "${NAME[$base]}" true
 done
 
 echo "== open, word wrap off =="
-for base in normal-1MB.txt normal-10MB.txt single-line-5MB.txt 500000-short-lines.txt; do
+for base in normal-10MB.txt 500000-short-lines.txt; do
   open_case "open-nowrap/$base" "${NAME[$base]}" false
 done
 
-echo "== zoom in once (Ctrl+=), time until the status bar shows 110% =="
-for base in normal-1MB.txt normal-10MB.txt single-line-5MB.txt 500000-short-lines.txt; do
-  fresh true 100; launch "${NAME[$base]}"; wait_for "${NAME[$base]}" >/dev/null; adb logcat -c
-  adb shell input keycombination KEYCODE_CTRL_LEFT KEYCODE_EQUALS
-  report "zoom/$base" "$(wait_for 110%)"
+echo "== zoom in 3 steps (Ctrl+=), time until the status bar shows 130% and the UI answers =="
+for n in "$N1M" "$N10M" "$N500K"; do
+  opened "$n" true
+  for _ in 1 2 3; do adb shell input keycombination KEYCODE_CTRL_LEFT KEYCODE_EQUALS; done
+  sleep 1
+  report "zoom/$n" "$(wait_for 130%)"
 done
 
-echo "== type 5 characters, time until the title shows the * =="
-for base in normal-1MB.txt normal-10MB.txt single-line-5MB.txt 500000-short-lines.txt; do
-  fresh true 100; launch "${NAME[$base]}"; wait_for "${NAME[$base]}" >/dev/null
-  adb shell input tap "$CX" "$CY"; sleep 2; adb logcat -c
+echo "== toggle word wrap from the menu =="
+for n in "$N10M" "$N500K"; do
+  opened "$n" true
+  tap "More options"; sleep 2; tap "Format"; sleep 2; tap "Word Wrap"
+  sleep 2
+  report "wrap-toggle/$n" "$(wait_for "$n")"
+done
+
+echo "== rotate to landscape and back =="
+adb shell settings put system accelerometer_rotation 0
+for n in "$N10M" "$N500K"; do
+  opened "$n" true
+  adb shell settings put system user_rotation 1; sleep 3
+  t1=$(wait_for "$n")
+  adb shell settings put system user_rotation 0; sleep 3
+  report "rotate/$n" "$t1/$(wait_for "$n")"
+done
+
+echo "== type 5 characters, then undo =="
+for n in "$N1M" "$N10M" "$N500K"; do
+  opened "$n" true
+  adb shell input tap "$CX" "$CY"; sleep 2
   adb shell input text hello
-  report "type/$base" "$(wait_for "*${NAME[$base]}")"
+  t1=$(wait_for "*$n")
+  adb shell input keycombination KEYCODE_CTRL_LEFT KEYCODE_Z
+  report "type-undo/$n" "$t1"
 done
 
-echo "== single-line-5MB: caret in the middle, then reopen (process-death restore path) =="
-fresh true 100; launch "${NAME[single-line-5MB.txt]}"; wait_for "${NAME[single-line-5MB.txt]}" >/dev/null
-adb shell input tap "$CX" "$CY"; sleep 2
-adb shell input keyevent KEYCODE_MOVE_END; sleep 5
-adb logcat -c
-adb shell input keyevent KEYCODE_HOME; sleep 2   # background the app
-adb shell am kill "$PKG"; sleep 2                 # simulated low-memory kill
-adb shell am start -n "$PKG/$ACT" >/dev/null
-report "restore/single-line-5MB" "$(wait_for "${NAME[single-line-5MB.txt]}")"
+echo "== single-line-5MB: long-lines dialog =="
+fresh true 100; launch "$N5M"
+report "long-lines-dialog/$N5M" "$(wait_for "very long lines")"
+tap "OPEN READ-ONLY"
+t=$(wait_for "$N5M")
+adb shell input tap "$CX" "$CY"; sleep 1; adb logcat -c
+adb shell input text hello; sleep 5
+report "long-lines-readonly-type/$N5M" "$t"
 
 echo
 echo "================ SUMMARY ================"

@@ -1,6 +1,7 @@
 package io.github.kaustubhowmick.plaintext.editor
 
 import android.content.Context
+import android.text.Editable
 import android.text.InputFilter
 import android.text.Spanned
 import android.text.style.TabStopSpan
@@ -17,6 +18,14 @@ import io.github.kaustubhowmick.plaintext.R
  * The document text area (design.md §3.2): an EditText tuned for large plain
  * text, with pinch/Ctrl+wheel zoom, a real Tab key, plain-text paste, and
  * Notepad-style 8-column tab stops.
+ *
+ * Android lays out an EditText by measuring every paragraph of the affected
+ * text in one pass, holding a measurement object per paragraph until the pass
+ * ends. For a few hundred thousand lines that runs out of memory (a
+ * 500,000-line file crashed on open). So whole-text changes and layout rebuilds
+ * go through [setTextInSlices], [replaceInSlices], and [onMeasure], which add
+ * the text [SLICE_LINES] lines at a time: each pass stays small and the
+ * finished layout is the same.
  */
 class EditorView @JvmOverloads constructor(
     context: Context,
@@ -42,7 +51,16 @@ class EditorView @JvmOverloads constructor(
             showSoftInputOnFocus = !value
         }
 
-    private var tabSpan: TabStopSpan? = null
+    /** True while the view takes its text out and puts it back to rebuild the layout; not an edit. */
+    var isSwappingText = false
+        private set
+
+    /** One tab stop every 8 spaces. Its width is updated in place, so font changes don't re-add a span. */
+    private val tabStops = object : TabStopSpan {
+        var width = 1
+        override fun getTabStop() = width
+    }
+    private var horizontallyScrolling = false
     private var pinchScale = 1f
 
     private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
@@ -67,14 +85,94 @@ class EditorView @JvmOverloads constructor(
         setTextClassifier(TextClassifier.NO_OP)
     }
 
-    /** Applies one TabStopSpan over the whole text: a stop every 8 spaces, like Notepad. */
+    /**
+     * Sets the tab width for the current font: a stop every 8 spaces, like Notepad.
+     * Takes effect at the next layout, which a font change always causes.
+     */
     fun applyTabStops() {
-        val text = text ?: return
-        tabSpan?.let { text.removeSpan(it) }
-        val width = (paint.measureText(" ") * 8).toInt().coerceAtLeast(1)
-        val span = TabStopSpan.Standard(width)
-        text.setSpan(span, 0, text.length, Spanned.SPAN_INCLUSIVE_INCLUSIVE)
-        tabSpan = span
+        tabStops.width = (paint.measureText(" ") * 8).toInt().coerceAtLeast(1)
+    }
+
+    /** Replaces the whole text with [content], adding it in slices (see the class comment). */
+    fun setTextInSlices(content: CharSequence) {
+        withoutFilters {
+            setText("") // a fresh Editable, and the IME starts over
+            // Attached while the text is empty, the inclusive span grows with each slice.
+            // Adding it over a big text would re-lay out all of it at once.
+            text.setSpan(tabStops, 0, 0, Spanned.SPAN_INCLUSIVE_INCLUSIVE)
+            insertSlices(text, 0, content)
+        }
+    }
+
+    /** `text.replace(start, end, content)`, inserting a big [content] in slices. */
+    fun replaceInSlices(start: Int, end: Int, content: CharSequence) {
+        val t = text
+        if (!TextSlices.hasMoreLinesThan(content, SLICE_LINES)) {
+            t.replace(start, end, content)
+            return
+        }
+        withoutFilters {
+            t.delete(start, end)
+            insertSlices(t, start, content)
+        }
+    }
+
+    private fun insertSlices(t: Editable, at: Int, content: CharSequence) {
+        var from = 0
+        while (from < content.length) {
+            val to = TextSlices.end(content, from, SLICE_LINES)
+            t.insert(at + from, content, from, to)
+            from = to
+        }
+    }
+
+    private inline fun withoutFilters(block: () -> Unit) {
+        val saved = filters
+        filters = NO_FILTERS
+        try {
+            block()
+        } finally {
+            filters = saved
+        }
+    }
+
+    override fun setHorizontallyScrolling(whether: Boolean) {
+        horizontallyScrolling = whether
+        super.setHorizontallyScrolling(whether)
+    }
+
+    /**
+     * Zoom, font, word-wrap, and width changes (rotation, split screen) make
+     * TextView rebuild the layout of the whole text here. For a big document,
+     * take the text out first and put it back in slices once the new, empty
+     * layout exists.
+     */
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val t = text
+        if (isSwappingText || !layoutWillBeRebuilt(widthMeasureSpec) || !TextSlices.hasMoreLinesThan(t, SLICE_LINES)) {
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+            return
+        }
+        val content = t.toString()
+        val selStart = selectionStart
+        val selEnd = selectionEnd
+        isSwappingText = true
+        try {
+            withoutFilters { t.clear() }
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+            withoutFilters { insertSlices(t, 0, content) }
+            setSelection(selStart.coerceIn(0, content.length), selEnd.coerceIn(0, content.length))
+        } finally {
+            isSwappingText = false
+        }
+        post { bringPointIntoView(selectionEnd) }
+    }
+
+    /** Mirrors TextView.onMeasure: no layout yet, or a new wrapping width. */
+    private fun layoutWillBeRebuilt(widthMeasureSpec: Int): Boolean {
+        val l = layout ?: return true
+        if (horizontallyScrolling || MeasureSpec.getMode(widthMeasureSpec) != MeasureSpec.EXACTLY) return false
+        return l.width != MeasureSpec.getSize(widthMeasureSpec) - compoundPaddingLeft - compoundPaddingRight
     }
 
     override fun onSelectionChanged(selStart: Int, selEnd: Int) {
@@ -140,8 +238,12 @@ class EditorView @JvmOverloads constructor(
         info.hintText = context.getString(R.string.editor_hint)
     }
 
-    private companion object {
+    companion object {
+        /** Lines per slice: small enough that one layout pass stays a few MB. */
+        const val SLICE_LINES = 10_000
+
         /** Keeps the destination unchanged: used for view-only documents. */
-        val REJECT_ALL = InputFilter { _, _, _, dest, dstart, dend -> dest.subSequence(dstart, dend) }
+        private val REJECT_ALL = InputFilter { _, _, _, dest, dstart, dend -> dest.subSequence(dstart, dend) }
+        private val NO_FILTERS = emptyArray<InputFilter>()
     }
 }

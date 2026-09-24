@@ -110,6 +110,10 @@
     <string name="invalid_encoding">This file isn\'t valid %1$s.</string>
     <string name="large_file">Large file — some actions may be slower.</string>
     <string name="long_lines">This file has very long lines; editing may be slow.</string>
+    <string name="long_lines_title">This file has very long lines</string>
+    <string name="long_lines_message">%1$s has a line of %2$s characters. Every change to a line that long makes PlainText stop responding for several seconds.</string>
+    <string name="edit_anyway">Edit anyway</string>
+    <string name="reformatting">Reformatting a large document. This can take a few seconds.</string>
 
     <!-- External changes (design.md §5.33) -->
     <string name="reloaded">%1$s was changed by another app and has been reloaded.</string>

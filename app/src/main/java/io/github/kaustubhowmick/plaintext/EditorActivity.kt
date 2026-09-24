@@ -74,6 +74,7 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.charset.CharacterCodingException
 import java.text.DateFormat
+import java.text.NumberFormat
 import java.util.Date
 
 /**
@@ -101,6 +102,7 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
 
     /** True while text is set programmatically (load/restore): not an edit. */
     private var loading = false
+    private val ignoringChanges: Boolean get() = loading || editor.isSwappingText
     private var pendingRemoved = ""
     private var pendingCaret = 0
 
@@ -188,6 +190,7 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
         activeDialog = null
         session.work.main.removeCallbacks(recoveryRunnable)
         session.work.main.removeCallbacks(showProgressRunnable)
+        session.work.main.removeCallbacks(applyZoomRunnable)
         if (isFinishing) session.work.shutdown()
         super.onDestroy()
     }
@@ -331,13 +334,13 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
 
     private val watcher = object : TextWatcher {
         override fun beforeTextChanged(s: CharSequence, start: Int, count: Int, after: Int) {
-            if (loading || !::session.isInitialized) return
+            if (ignoringChanges || !::session.isInitialized) return
             pendingRemoved = if (session.undo.isApplying || count == 0) "" else s.subSequence(start, start + count).toString()
             pendingCaret = editor.selectionStart
         }
 
         override fun onTextChanged(s: CharSequence, start: Int, before: Int, count: Int) {
-            if (loading || !::session.isInitialized) return
+            if (ignoringChanges || !::session.isInitialized) return
             val inserted = s.subSequence(start, start + count)
             session.lines.onReplace(start, before, inserted)
             session.revision++
@@ -349,7 +352,7 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
         }
 
         override fun afterTextChanged(s: Editable) {
-            if (!loading && ::session.isInitialized) onDocumentChanged()
+            if (!ignoringChanges && ::session.isInitialized) onDocumentChanged()
         }
     }
 
@@ -368,14 +371,13 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
         editor.viewOnly = false
         loading = true
         try {
-            editor.setText(text)
+            editor.setTextInSlices(text)
         } finally {
             loading = false
         }
         session.lines.rebuild(text)
         session.revision++
         session.clearSnapshot()
-        editor.applyTabStops()
         editor.viewOnly = doc.access.isViewOnly
         editor.post { fastScroller.sync() }
     }
@@ -400,7 +402,7 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
     // ---------------------------------------------------------- EditorView.Listener
 
     override fun onSelectionChanged(start: Int, end: Int) {
-        if (loading || !::session.isInitialized) return
+        if (ignoringChanges || !::session.isInitialized) return
         // Moving the caret yourself ends the current undo group (design.md §5.10).
         if (start != end || end != session.undo.expectedCaret) session.undo.breakGroup()
         scheduleStatus()
@@ -421,7 +423,7 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
         if (finished) {
             pinchBaseZoom = 0
             setZoom(((raw + ZOOM_STEP / 2) / ZOOM_STEP * ZOOM_STEP).coerceIn(Settings.ZOOM_MIN, Settings.ZOOM_MAX))
-        } else if (editor.length() <= LARGE_FILE_CHARS) {
+        } else if (!isLargeDocument()) {
             editor.setTextSize(TypedValue.COMPLEX_UNIT_SP, settings.fontSizeSp * raw / 100f)
         }
     }
@@ -432,7 +434,8 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
         val suffix = when {
             doc.deletedOnDisk -> getString(R.string.suffix_deleted)
             doc.access == AccessMode.VIEW_ONLY_PREVIEW -> getString(R.string.suffix_preview)
-            doc.access == AccessMode.READ_ONLY_FILE || doc.access == AccessMode.VIEW_ONLY_BINARY ->
+            doc.access == AccessMode.READ_ONLY_FILE || doc.access == AccessMode.VIEW_ONLY_BINARY ||
+                doc.access == AccessMode.VIEW_ONLY_LONG_LINES ->
                 getString(R.string.suffix_read_only)
             else -> ""
         }
@@ -564,12 +567,18 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
         RELOAD,     // external change: keep caret, no .LOG
         REOPEN,     // Reopen with Encoding
         RESTORE,    // after process death: silent, no .LOG
+        LONG_LINES_VIEW, // the user chose "Open read-only" for a file with very long lines
+        LONG_LINES_EDIT; // the user chose "Edit anyway"
+
+        /** Opened by the user (not a reload or restore): .LOG applies, Recent files updated. */
+        val byUser: Boolean get() = this == NORMAL || this == LONG_LINES_VIEW || this == LONG_LINES_EDIT
     }
 
     private sealed class OpenResult {
         class Loaded(val text: String, val doc: Document, val mixed: IntArray?, val longLines: Boolean) : OpenResult()
         class TooLarge(val name: String, val size: Long) : OpenResult()
         class Binary(val name: String) : OpenResult()
+        class LongLines(val name: String, val longest: Int) : OpenResult()
         class InvalidEncoding(val encoding: Encoding) : OpenResult()
     }
 
@@ -647,9 +656,14 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
         for (c in normalized) {
             if (c == '\n') run = 0 else if (++run > longest) longest = run
         }
+        // Every change to a line re-measures all of it, so editing a line of
+        // millions of characters freezes the app for seconds per keystroke.
+        val tooLongToEdit = longest > LONG_LINE_EDIT_CHARS && !preview && !detection.isBinary
+        if (tooLongToEdit && mode == OpenMode.NORMAL) return OpenResult.LongLines(name, longest)
         val access = when {
             preview -> AccessMode.VIEW_ONLY_PREVIEW
             detection.isBinary -> AccessMode.VIEW_ONLY_BINARY
+            mode == OpenMode.LONG_LINES_VIEW || (tooLongToEdit && mode == OpenMode.RESTORE) -> AccessMode.VIEW_ONLY_LONG_LINES
             origin == Origin.SHARE -> AccessMode.READ_ONLY_FILE
             meta.supportsWrite == false -> AccessMode.READ_ONLY_FILE
             (origin == Origin.VIEW_INTENT || origin == Origin.EDIT_INTENT) && !writeGranted -> AccessMode.READ_ONLY_FILE
@@ -687,6 +701,14 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
                     .setPositiveButton(R.string.open_read_only) { _, _ -> openUri(uri, origin, OpenMode.BINARY_OK) }
                     .setNegativeButton(R.string.cancel, null)
             )
+            is OpenResult.LongLines -> showDialog(
+                AlertDialog.Builder(this)
+                    .setTitle(R.string.long_lines_title)
+                    .setMessage(getString(R.string.long_lines_message, r.name, NumberFormat.getIntegerInstance().format(r.longest)))
+                    .setPositiveButton(R.string.open_read_only) { _, _ -> openUri(uri, origin, OpenMode.LONG_LINES_VIEW) }
+                    .setNeutralButton(R.string.edit_anyway) { _, _ -> openUri(uri, origin, OpenMode.LONG_LINES_EDIT) }
+                    .setNegativeButton(R.string.cancel, null)
+            )
             is OpenResult.InvalidEncoding -> showMessage(getString(R.string.invalid_encoding, r.encoding.label))
             is OpenResult.Loaded -> applyLoaded(r, mode, caret)
         }
@@ -714,14 +736,15 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
         if (target > 0) editor.post { editor.bringPointIntoView(editor.selectionEnd) }
         discardRecovery()
 
-        if (mode == OpenMode.NORMAL || mode == OpenMode.BINARY_OK || mode == OpenMode.PREVIEW) {
+        if (mode.byUser || mode == OpenMode.BINARY_OK || mode == OpenMode.PREVIEW) {
             if (r.doc.origin != Origin.SHARE) addRecent(r.doc.uri!!, r.doc.displayName)
         }
-        if (mode == OpenMode.NORMAL) onFileOpened()
+        if (mode.byUser) onFileOpened()
         when {
             r.mixed != null && mode != OpenMode.RESTORE -> toast(getString(R.string.mixed_on_open))
-            r.longLines -> toast(getString(R.string.long_lines))
-            r.text.length > LARGE_FILE_CHARS && mode == OpenMode.NORMAL -> toast(getString(R.string.large_file))
+            // After the long-lines dialog, the user already knows.
+            r.longLines && mode != OpenMode.LONG_LINES_VIEW && mode != OpenMode.LONG_LINES_EDIT -> toast(getString(R.string.long_lines))
+            r.text.length > LARGE_FILE_CHARS && mode.byUser -> toast(getString(R.string.large_file))
         }
         if (mode == OpenMode.RELOAD) toast(getString(R.string.reloaded, r.doc.displayName))
     }
@@ -1691,24 +1714,25 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
             val col = caret - session.lines.lineStart(line)
             clearMatchHighlight()
             val editable = editor.text
+            val caretBefore = editor.selectionStart
+            // One whole-text replacement, inserted in slices and recorded as a single undo step.
+            loading = true
+            try {
+                editor.replaceInSlices(0, editable.length, result.text)
+            } finally {
+                loading = false
+            }
+            session.lines.rebuild(result.text)
+            session.revision++
+            session.clearSnapshot()
             if (undoable) {
                 session.undo.breakGroup()
-                editable.replace(0, editable.length, result.text)
+                session.undo.record(0, text, result.text, caretBefore, composing = false)
                 session.undo.breakGroup()
             } else {
-                loading = true
-                try {
-                    editable.replace(0, editable.length, result.text)
-                } finally {
-                    loading = false
-                }
-                session.lines.rebuild(result.text)
-                session.revision++
-                session.clearSnapshot()
                 session.undo.discardHistory()
-                onDocumentChanged()
             }
-            editor.applyTabStops()
+            onDocumentChanged()
             val l = line.coerceAtMost(session.lines.lineCount - 1)
             val lineEnd = if (l + 1 < session.lines.lineCount) session.lines.lineStart(l + 1) - 1 else editable.length
             editor.setSelection((session.lines.lineStart(l) + col).coerceAtMost(lineEnd))
@@ -1846,14 +1870,14 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
 
     private fun undo() {
         if (doc.access.isViewOnly) return
-        val caret = session.undo.undo { s, e, t -> editor.text.replace(s, e, t) }
+        val caret = session.undo.undo { s, e, t -> editor.replaceInSlices(s, e, t) }
         if (caret >= 0) editor.setSelection(caret.coerceIn(0, editor.length()))
         onDocumentChanged()
     }
 
     private fun redo() {
         if (doc.access.isViewOnly) return
-        val caret = session.undo.redo { s, e, t -> editor.text.replace(s, e, t) }
+        val caret = session.undo.redo { s, e, t -> editor.replaceInSlices(s, e, t) }
         if (caret >= 0) editor.setSelection(caret.coerceIn(0, editor.length()))
         onDocumentChanged()
     }
@@ -1951,8 +1975,21 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
         editor.setHorizontallyScrolling(!settings.wordWrap)
     }
 
+    /**
+     * True when re-laying out the text (zoom, font, word wrap) takes long enough
+     * to notice: many characters, many lines, or one very long line.
+     */
+    private fun isLargeDocument() =
+        editor.length() > LARGE_FILE_CHARS || session.lines.lineCount > EditorView.SLICE_LINES
+
+    /** Says a relayout is coming; toasts are drawn by the system, so this one shows while the app is busy. */
+    private fun warnIfSlowRelayout() {
+        if (isLargeDocument()) toast(getString(R.string.reformatting))
+    }
+
     private fun toggleWordWrap() {
         settings.wordWrap = !settings.wordWrap
+        warnIfSlowRelayout()
         applyWordWrap()
         if (settings.wordWrap) editor.scrollTo(0, editor.scrollY)
         editor.post { editor.bringPointIntoView(editor.selectionEnd) }
@@ -1960,10 +1997,21 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
 
     private fun zoomBy(delta: Int) = setZoom(settings.zoomPercent + delta)
 
+    /**
+     * Zooming re-lays out the whole text. For a large document, repeated steps
+     * (Ctrl+= pressed several times) are applied once, after they stop.
+     */
     private fun setZoom(percent: Int) {
         settings.zoomPercent = percent.coerceIn(Settings.ZOOM_MIN, Settings.ZOOM_MAX)
-        applyFont()
         scheduleStatus()
+        val main = session.work.main
+        main.removeCallbacks(applyZoomRunnable)
+        if (isLargeDocument()) main.postDelayed(applyZoomRunnable, ZOOM_SETTLE_MS) else applyZoomRunnable.run()
+    }
+
+    private val applyZoomRunnable = Runnable {
+        warnIfSlowRelayout()
+        applyFont()
         editor.post { editor.bringPointIntoView(editor.selectionEnd) }
     }
 
@@ -1975,6 +2023,7 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
             settings.fontFamily = c.family
             settings.fontStyle = c.style
             settings.fontSizeSp = c.sizeSp
+            warnIfSlowRelayout()
             applyFont()
         }
     }
@@ -2060,6 +2109,9 @@ class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
         const val WIDE_DP = 600
         const val NARROW_DP = 360
         const val ZOOM_STEP = 10
+        const val ZOOM_SETTLE_MS = 400L
+        /** Longer lines open read-only unless the user chooses to edit (see OpenResult.LongLines). */
+        const val LONG_LINE_EDIT_CHARS = 500_000
         const val MAX_PREFILL = 200
         val ENCODING_ITEMS = intArrayOf(R.id.enc_utf8, R.id.enc_utf8_bom, R.id.enc_utf16le, R.id.enc_utf16be, R.id.enc_ansi)
         val EOL_ITEMS = intArrayOf(R.id.eol_crlf, R.id.eol_lf, R.id.eol_cr)
