@@ -12,6 +12,11 @@
         android:title="@string/save" />
 
     <item
+        android:id="@+id/action_find"
+        android:icon="@drawable/ic_search"
+        android:showAsAction="always"
+        android:title="@string/find" />
+    <item
         android:id="@+id/action_redo"
         android:icon="@drawable/ic_redo"
         android:showAsAction="ifRoom"
@@ -56,6 +61,9 @@
                 </menu>
             </item>
             <item android:id="@+id/file_default_folder" android:title="@string/default_folder" />
+            <item android:id="@+id/file_page_setup" android:title="@string/page_setup_menu" />
+            <item android:id="@+id/file_print" android:title="@string/print_menu"
+                android:alphabeticShortcut="p" android:alphabeticModifiers="CTRL" />
             <item android:id="@+id/file_exit" android:title="@string/exit" />
         </menu>
     </item>
@@ -76,8 +84,73 @@
             <item android:id="@+id/edit_paste" android:title="@string/paste"
                 android:alphabeticShortcut="v" android:alphabeticModifiers="CTRL" />
             <item android:id="@+id/edit_delete" android:title="@string/delete" />
+            <item android:id="@+id/edit_find" android:title="@string/find_menu"
+                android:alphabeticShortcut="f" android:alphabeticModifiers="CTRL" />
+            <item android:id="@+id/edit_find_next" android:title="@string/find_next" />
+            <item android:id="@+id/edit_find_previous" android:title="@string/find_previous" />
+            <item android:id="@+id/edit_replace" android:title="@string/replace_menu"
+                android:alphabeticShortcut="h" android:alphabeticModifiers="CTRL" />
+            <item android:id="@+id/edit_go_to" android:title="@string/go_to_menu"
+                android:alphabeticShortcut="g" android:alphabeticModifiers="CTRL" />
             <item android:id="@+id/edit_select_all" android:title="@string/select_all"
                 android:alphabeticShortcut="a" android:alphabeticModifiers="CTRL" />
+            <item android:id="@+id/edit_time_date" android:title="@string/time_date" />
+        </menu>
+    </item>
+
+    <item
+        android:id="@+id/menu_format"
+        android:showAsAction="never"
+        android:title="@string/menu_format">
+        <menu>
+            <item android:id="@+id/format_word_wrap" android:checkable="true" android:title="@string/word_wrap" />
+            <item android:id="@+id/format_font" android:title="@string/font_menu" />
+        </menu>
+    </item>
+
+    <item
+        android:id="@+id/menu_view"
+        android:showAsAction="never"
+        android:title="@string/menu_view">
+        <menu>
+            <item android:id="@+id/view_zoom" android:title="@string/zoom">
+                <menu>
+                    <item android:id="@+id/zoom_in" android:title="@string/zoom_in" />
+                    <item android:id="@+id/zoom_out" android:title="@string/zoom_out" />
+                    <item android:id="@+id/zoom_reset" android:title="@string/restore_zoom" />
+                </menu>
+            </item>
+            <item android:id="@+id/view_status_bar" android:checkable="true" android:title="@string/status_bar" />
+            <item android:id="@+id/view_encoding" android:title="@string/encoding">
+                <menu>
+                    <group android:id="@+id/encoding_group" android:checkableBehavior="single">
+                        <item android:id="@+id/enc_utf8" android:title="UTF-8" />
+                        <item android:id="@+id/enc_utf8_bom" android:title="UTF-8 with BOM" />
+                        <item android:id="@+id/enc_utf16le" android:title="UTF-16 LE" />
+                        <item android:id="@+id/enc_utf16be" android:title="UTF-16 BE" />
+                        <item android:id="@+id/enc_ansi" android:title="ANSI" />
+                    </group>
+                </menu>
+            </item>
+            <item android:id="@+id/view_line_ending" android:title="@string/line_ending">
+                <menu>
+                    <group android:id="@+id/eol_group" android:checkableBehavior="single">
+                        <item android:id="@+id/eol_crlf" android:title="Windows (CRLF)" />
+                        <item android:id="@+id/eol_lf" android:title="Unix (LF)" />
+                        <item android:id="@+id/eol_cr" android:title="Macintosh (CR)" />
+                    </group>
+                </menu>
+            </item>
+        </menu>
+    </item>
+
+    <item
+        android:id="@+id/menu_help"
+        android:showAsAction="never"
+        android:title="@string/menu_help">
+        <menu>
+            <item android:id="@+id/help_shortcuts" android:title="@string/keyboard_shortcuts" />
+            <item android:id="@+id/help_about" android:title="@string/about" />
         </menu>
     </item>
 </menu>

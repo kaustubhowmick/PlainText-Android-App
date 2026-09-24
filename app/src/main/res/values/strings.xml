@@ -118,5 +118,102 @@
     <string name="reload">Reload</string>
     <string name="keep_mine">Keep my version</string>
     <string name="deleted_externally">%1$s no longer exists. Your text is still here — save to keep it.</string>
+    <!-- Edit / Format / View / Help menus (phase 4) -->
+    <string name="menu_format">Format</string>
+    <string name="menu_view">View</string>
+    <string name="menu_help">Help</string>
+    <string name="find">Find</string>
+    <string name="find_menu">Find…</string>
+    <string name="find_next">Find Next</string>
+    <string name="find_previous">Find Previous</string>
+    <string name="replace_menu">Replace…</string>
+    <string name="go_to_menu">Go To…</string>
+    <string name="time_date">Time/Date</string>
+    <string name="word_wrap">Word Wrap</string>
+    <string name="font_menu">Font…</string>
+    <string name="zoom">Zoom</string>
+    <string name="zoom_in">Zoom In</string>
+    <string name="zoom_out">Zoom Out</string>
+    <string name="restore_zoom">Restore Default Zoom</string>
+    <string name="status_bar">Status Bar</string>
+    <string name="encoding">Encoding</string>
+    <string name="line_ending">Line Ending</string>
+    <string name="keyboard_shortcuts">Keyboard Shortcuts</string>
+    <string name="about">About PlainText</string>
+    <string name="page_setup_menu">Page Setup…</string>
+    <string name="print_menu">Print…</string>
+
+    <!-- Find bar (design.md §6.4) -->
+    <string name="find_hint">Find</string>
+    <string name="replace_hint">Replace with</string>
+    <string name="find_previous_match">Previous match</string>
+    <string name="find_next_match">Next match</string>
+    <string name="match_case">Match case</string>
+    <string name="wrap_around">Wrap around</string>
+    <string name="wrap_short">Wrap</string>
+    <string name="close_find">Close find</string>
+    <string name="replace_all">Replace all</string>
+    <string name="replace_all_short">All</string>
+    <string name="cannot_find">Cannot find "%1$s"</string>
+    <plurals name="replaced_count">
+        <item quantity="one">Replaced %1$d occurrence</item>
+        <item quantity="other">Replaced %1$d occurrences</item>
+    </plurals>
+    <string name="replace_all_no_undo">Replace All can\'t be undone for a file this large. Continue?</string>
+
+    <!-- Go To (design.md §6.5) -->
+    <string name="go_to_line">Go To Line</string>
+    <string name="go_to">Go To</string>
+    <string name="line_number">Line number:</string>
+    <string name="line_out_of_range">The line number is beyond the total number of lines</string>
+
+    <!-- Font (design.md §6.6) -->
+    <string name="font">Font</string>
+    <string name="font_family">Font:</string>
+    <string name="font_style">Style:</string>
+    <string name="font_size">Size:</string>
+    <string name="sample">Sample</string>
+    <string-array name="font_families">
+        <item>Monospace</item>
+        <item>Sans Serif</item>
+        <item>Serif</item>
+        <item>Sans Serif Condensed</item>
+        <item>Serif Monospace</item>
+    </string-array>
+    <string-array name="font_styles">
+        <item>Regular</item>
+        <item>Italic</item>
+        <item>Bold</item>
+        <item>Bold Italic</item>
+    </string-array>
+
+    <!-- Page Setup and printing (design.md §5.7, §6.8) -->
+    <string name="page_setup">Page Setup</string>
+    <string name="margins_mm">Margins (millimetres)</string>
+    <string name="margin_left">Left</string>
+    <string name="margin_right">Right</string>
+    <string name="margin_top">Top</string>
+    <string name="margin_bottom">Bottom</string>
+    <string name="margin_range">Margins must be between 0 and 100 mm.</string>
+    <string name="header">Header</string>
+    <string name="footer">Footer</string>
+    <string name="print_font_size">Font size (pt)</string>
+    <string name="page_codes">&amp;f file name   &amp;p page   &amp;d date   &amp;t time\n&amp;l left   &amp;c center   &amp;r right   &amp;&amp; &amp;</string>
+    <string name="paper_in_print_dialog">Paper size and orientation are set in the print dialog.</string>
+    <string name="print_failed">Couldn\'t prepare the document for printing.</string>
+
+    <!-- Status bar (design.md §5.19) -->
+    <string name="ln_col">Ln %1$d, Col %2$d</string>
+    <string name="zoom_percent">%1$d%%</string>
+    <string name="mixed_eol">Mixed → %1$s</string>
+    <string name="a11y_position">Line %1$d, column %2$d</string>
+    <string name="a11y_zoom">Zoom %1$d percent</string>
+    <string name="a11y_encoding">Encoding %1$s, double-tap to change</string>
+    <string name="a11y_line_ending">Line ending %1$s, double-tap to change</string>
+
+    <!-- Help (design.md §5.21) -->
+    <string name="about_text">Version %1$s\n\nA plain-text editor in the spirit of classic Windows Notepad.\n\nNo internet access. No tracking. Your files stay where you put them.</string>
+    <string name="shortcuts_text">Ctrl+N\tNew\nCtrl+O\tOpen\nCtrl+S\tSave\nCtrl+Shift+S\tSave As\nCtrl+P\tPrint\nCtrl+Z\tUndo\nCtrl+Y, Ctrl+Shift+Z\tRedo\nCtrl+X / C / V\tCut / Copy / Paste\nDel\tDelete\nCtrl+A\tSelect All\nCtrl+F\tFind\nF3 / Shift+F3\tFind Next / Previous\nCtrl+H\tReplace\nCtrl+G\tGo To Line\nF5\tTime/Date\nCtrl+Plus / Minus / 0\tZoom in / out / reset\nCtrl+mouse wheel\tZoom\nEsc\tClose the find bar\nTab\tInsert a tab</string>
 </resources>
+
 

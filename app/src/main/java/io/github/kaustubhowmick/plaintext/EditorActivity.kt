@@ -1,5 +1,6 @@
 package io.github.kaustubhowmick.plaintext
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.ActivityManager
 import android.app.AlertDialog
@@ -15,19 +16,26 @@ import android.os.Process
 import android.provider.DocumentsContract
 import android.system.ErrnoException
 import android.system.OsConstants
+import android.print.PrintManager
 import android.text.Editable
+import android.text.Spanned
+import android.text.style.BackgroundColorSpan
 import android.text.Spannable
 import android.text.TextWatcher
 import android.text.format.Formatter
 import android.util.TypedValue
 import android.view.KeyEvent
+import android.view.KeyboardShortcutGroup
+import android.view.KeyboardShortcutInfo
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.WindowInsets
 import android.view.inputmethod.BaseInputConnection
+import android.view.inputmethod.InputMethodManager
 import android.webkit.MimeTypeMap
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.ProgressBar
 import android.widget.RadioButton
 import android.widget.RadioGroup
@@ -40,6 +48,10 @@ import io.github.kaustubhowmick.plaintext.editor.AccessMode
 import io.github.kaustubhowmick.plaintext.editor.DiskStamp
 import io.github.kaustubhowmick.plaintext.editor.Document
 import io.github.kaustubhowmick.plaintext.editor.EditorView
+import io.github.kaustubhowmick.plaintext.editor.LogFeature
+import io.github.kaustubhowmick.plaintext.editor.SearchEngine
+import io.github.kaustubhowmick.plaintext.editor.TimeDate
+import io.github.kaustubhowmick.plaintext.editor.UndoManager
 import io.github.kaustubhowmick.plaintext.editor.Origin
 import io.github.kaustubhowmick.plaintext.io.Detection
 import io.github.kaustubhowmick.plaintext.io.DocumentIo
@@ -53,7 +65,11 @@ import io.github.kaustubhowmick.plaintext.storage.DefaultFolder
 import io.github.kaustubhowmick.plaintext.storage.RecentFiles
 import io.github.kaustubhowmick.plaintext.storage.RecoveryStore
 import io.github.kaustubhowmick.plaintext.storage.Settings
+import io.github.kaustubhowmick.plaintext.print.TextPrintAdapter
 import io.github.kaustubhowmick.plaintext.ui.Dialogs
+import io.github.kaustubhowmick.plaintext.ui.FastScroller
+import io.github.kaustubhowmick.plaintext.ui.FindBar
+import io.github.kaustubhowmick.plaintext.ui.StatusBarView
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.charset.CharacterCodingException
@@ -65,7 +81,7 @@ import java.util.Date
  * back handling, activity results, intent handling, and the open/save flows.
  * Long-lived state lives in [EditorSession], which survives configuration changes.
  */
-class EditorActivity : Activity(), EditorView.Listener {
+class EditorActivity : Activity(), EditorView.Listener, FindBar.Listener {
 
     private lateinit var settings: Settings
     private lateinit var recovery: RecoveryStore
@@ -76,6 +92,9 @@ class EditorActivity : Activity(), EditorView.Listener {
     private lateinit var editor: EditorView
     private lateinit var titleView: TextView
     private lateinit var progress: ProgressBar
+    private lateinit var findBar: FindBar
+    private lateinit var statusBar: StatusBarView
+    private lateinit var fastScroller: FastScroller
 
     private val doc: Document get() = session.doc
     private val isDirty: Boolean get() = session.undo.isDirty || doc.metadataDirty
@@ -93,6 +112,12 @@ class EditorActivity : Activity(), EditorView.Listener {
 
     private val recoveryRunnable = Runnable { writeRecovery() }
     private val showProgressRunnable = Runnable { progress.visibility = View.VISIBLE }
+    private var statusPosted = false
+    private val statusRunnable = Runnable {
+        statusPosted = false
+        updateStatus()
+    }
+    private var pinchBaseZoom = 0
 
     // ---------------------------------------------------------------- lifecycle
 
@@ -112,9 +137,19 @@ class EditorActivity : Activity(), EditorView.Listener {
         editor = findViewById(R.id.editor)
         editor.listener = this
         editor.addTextChangedListener(watcher)
+        findBar = findViewById(R.id.find_bar)
+        findBar.listener = this
+        findBar.setOptions(settings.findMatchCase, settings.findWrapAround)
+        statusBar = findViewById(R.id.status_bar)
+        statusBar.lineEnding.setOnClickListener { chooseLineEnding() }
+        statusBar.encoding.setOnClickListener { chooseEncoding() }
+        fastScroller = findViewById(R.id.fast_scroller)
+        fastScroller.target = editor
+        editor.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fastScroller.sync() }
         applyEdgeToEdge(findViewById(R.id.root))
         applyFont()
         applyWordWrap()
+        applyStatusBarVisibility()
 
         @Suppress("DEPRECATION")
         val retained = lastNonConfigurationInstance as? EditorSession
@@ -126,8 +161,10 @@ class EditorActivity : Activity(), EditorView.Listener {
             session.undo.reset()
             if (savedInstanceState != null) restoreAfterProcessDeath(savedInstanceState) else coldStart()
         }
+        restoreFindBar()
         updateTitle()
         updateBackCallback()
+        scheduleStatus()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -162,6 +199,9 @@ class EditorActivity : Activity(), EditorView.Listener {
         session.selEnd = editor.selectionEnd
         session.scrollX = editor.scrollX
         session.scrollY = editor.scrollY
+        session.findTerm = findBar.term
+        session.replaceTerm = findBar.replacement
+        session.replaceVisible = findBar.isReplaceVisible
         return session
     }
 
@@ -291,13 +331,13 @@ class EditorActivity : Activity(), EditorView.Listener {
 
     private val watcher = object : TextWatcher {
         override fun beforeTextChanged(s: CharSequence, start: Int, count: Int, after: Int) {
-            if (loading) return
+            if (loading || !::session.isInitialized) return
             pendingRemoved = if (session.undo.isApplying || count == 0) "" else s.subSequence(start, start + count).toString()
             pendingCaret = editor.selectionStart
         }
 
         override fun onTextChanged(s: CharSequence, start: Int, before: Int, count: Int) {
-            if (loading) return
+            if (loading || !::session.isInitialized) return
             val inserted = s.subSequence(start, start + count)
             session.lines.onReplace(start, before, inserted)
             session.revision++
@@ -309,11 +349,13 @@ class EditorActivity : Activity(), EditorView.Listener {
         }
 
         override fun afterTextChanged(s: Editable) {
-            if (!loading) onDocumentChanged()
+            if (!loading && ::session.isInitialized) onDocumentChanged()
         }
     }
 
     private fun onDocumentChanged() {
+        if (matchSpan != null) clearMatchHighlight()
+        scheduleStatus()
         updateTitle()
         updateBackCallback()
         scheduleRecovery()
@@ -322,6 +364,7 @@ class EditorActivity : Activity(), EditorView.Listener {
 
     /** Replaces the whole text without recording an edit. */
     private fun setEditorText(text: String) {
+        matchSpan = null
         editor.viewOnly = false
         loading = true
         try {
@@ -356,20 +399,33 @@ class EditorActivity : Activity(), EditorView.Listener {
     // ---------------------------------------------------------- EditorView.Listener
 
     override fun onSelectionChanged(start: Int, end: Int) {
-        if (loading) return
+        if (loading || !::session.isInitialized) return
         // Moving the caret yourself ends the current undo group (design.md §5.10).
         if (start != end || end != session.undo.expectedCaret) session.undo.breakGroup()
+        scheduleStatus()
     }
 
-    override fun onScrolled() {}
+    override fun onScrolled() {
+        if (fastScroller.visibility == View.VISIBLE) fastScroller.invalidate()
+    }
 
     override fun onBeforeClipboardEdit() {
         session.undo.breakGroup()
     }
 
-    override fun onZoomStep(zoomIn: Boolean) {}
+    override fun onZoomStep(zoomIn: Boolean) = zoomBy(if (zoomIn) ZOOM_STEP else -ZOOM_STEP)
 
-    override fun onPinch(scale: Float, finished: Boolean) {}
+    /** Pinch-to-zoom (§5.18): live under 1 MB, applied at gesture end for larger documents. */
+    override fun onPinch(scale: Float, finished: Boolean) {
+        if (pinchBaseZoom == 0) pinchBaseZoom = settings.zoomPercent
+        val raw = (pinchBaseZoom * scale).toInt().coerceIn(Settings.ZOOM_MIN, Settings.ZOOM_MAX)
+        if (finished) {
+            pinchBaseZoom = 0
+            setZoom(((raw + ZOOM_STEP / 2) / ZOOM_STEP * ZOOM_STEP).coerceIn(Settings.ZOOM_MIN, Settings.ZOOM_MAX))
+        } else if (editor.length() <= LARGE_FILE_CHARS) {
+            editor.setTextSize(TypedValue.COMPLEX_UNIT_SP, settings.fontSizeSp * raw / 100f)
+        }
+    }
 
     // ------------------------------------------------------------------ title/back
 
@@ -390,7 +446,7 @@ class EditorActivity : Activity(), EditorView.Listener {
         setTaskDescription(ActivityManager.TaskDescription(t))
     }
 
-    private fun needsBackIntercept() = isDirty
+    private fun needsBackIntercept() = isDirty || findBar.visibility == View.VISIBLE
 
     /** Registers the predictive-back callback only while Back must be intercepted (design.md §5.8). */
     private fun updateBackCallback() {
@@ -409,6 +465,10 @@ class EditorActivity : Activity(), EditorView.Listener {
 
     /** Returns true if Back was consumed. */
     private fun handleBack(): Boolean {
+        if (findBar.visibility == View.VISIBLE) {
+            onFindClosed()
+            return true
+        }
         if (isDirty) {
             runWithSavePrompt(PendingAction(PendingAction.Kind.EXIT))
             return true
@@ -416,6 +476,9 @@ class EditorActivity : Activity(), EditorView.Listener {
         return false
     }
 
+    // Only reached on API 26–32. API 33+ uses the OnBackInvokedCallback above, which is
+    // what the GestureBackNavigation lint check asks for; AndroidX isn't available here.
+    @SuppressLint("GestureBackNavigation")
     @Deprecated("Used on API 26–32 only; API 33+ uses OnBackInvokedCallback.")
     override fun onBackPressed() {
         if (!handleBack()) {
@@ -664,8 +727,17 @@ class EditorActivity : Activity(), EditorView.Listener {
         if (mode == OpenMode.RELOAD) toast(getString(R.string.reloaded, r.doc.displayName))
     }
 
-    /** Hook for behavior that runs after a user-initiated open (the .LOG feature). */
-    private fun onFileOpened() {}
+    /** Notepad's .LOG: append a time stamp each time such a file is opened (§5.27). */
+    private fun onFileOpened() {
+        if (doc.access.isViewOnly) return
+        val text = editor.text
+        if (!LogFeature.isLogFile(text)) return
+        session.undo.breakGroup()
+        text.append(LogFeature.entry(text, TimeDate.now(this)))
+        session.undo.breakGroup()
+        editor.setSelection(text.length)
+        editor.post { editor.bringPointIntoView(editor.selectionEnd) }
+    }
 
     private fun onOpenFailed(uri: Uri, origin: Origin, mode: OpenMode, e: Throwable) {
         if (mode == OpenMode.RESTORE) return
@@ -1379,6 +1451,16 @@ class EditorActivity : Activity(), EditorView.Listener {
         menu.findItem(R.id.file_save)?.isEnabled = editable
         menu.findItem(R.id.file_save_as)?.isEnabled = editable
         menu.findItem(R.id.file_reopen)?.isEnabled = doc.uri != null
+        menu.findItem(R.id.edit_replace)?.isEnabled = editable
+        menu.findItem(R.id.edit_time_date)?.isEnabled = editable
+        menu.findItem(R.id.edit_find_next)?.isEnabled = session.findTerm.isNotEmpty() || findBar.term.isNotEmpty()
+        menu.findItem(R.id.edit_find_previous)?.isEnabled = session.findTerm.isNotEmpty() || findBar.term.isNotEmpty()
+        menu.findItem(R.id.format_word_wrap)?.isChecked = settings.wordWrap
+        menu.findItem(R.id.view_status_bar)?.isChecked = settings.statusBar
+        menu.findItem(R.id.view_encoding)?.isEnabled = editable
+        menu.findItem(R.id.view_line_ending)?.isEnabled = editable
+        menu.findItem(ENCODING_ITEMS[doc.encoding.ordinal])?.isChecked = true
+        menu.findItem(EOL_ITEMS[doc.lineEnding.ordinal])?.isChecked = true
         populateRecent(menu)
         return true
     }
@@ -1408,7 +1490,33 @@ class EditorActivity : Activity(), EditorView.Listener {
             R.id.reopen_utf16be -> reopenWith(Encoding.UTF16BE)
             R.id.reopen_ansi -> reopenWith(Encoding.ANSI)
             R.id.file_default_folder -> showDefaultFolder()
+            R.id.file_page_setup -> showPageSetup()
+            R.id.file_print -> print()
             R.id.file_exit -> exitApp()
+            R.id.action_find, R.id.edit_find -> showFindBar(replace = false)
+            R.id.edit_replace -> showFindBar(replace = true)
+            R.id.edit_find_next -> findAgain(true)
+            R.id.edit_find_previous -> findAgain(false)
+            R.id.edit_go_to -> showGoTo()
+            R.id.edit_time_date -> insertTimeDate()
+            R.id.format_word_wrap -> toggleWordWrap()
+            R.id.format_font -> showFontDialog()
+            R.id.zoom_in -> zoomBy(ZOOM_STEP)
+            R.id.zoom_out -> zoomBy(-ZOOM_STEP)
+            R.id.zoom_reset -> setZoom(100)
+            R.id.view_status_bar -> {
+                settings.statusBar = !settings.statusBar
+                applyStatusBarVisibility()
+            }
+            in ENCODING_ITEMS -> setEncoding(Encoding.entries[ENCODING_ITEMS.indexOf(id)])
+            in EOL_ITEMS -> setLineEnding(LineEnding.entries[EOL_ITEMS.indexOf(id)])
+            R.id.help_shortcuts -> showDialog(
+                AlertDialog.Builder(this)
+                    .setTitle(R.string.keyboard_shortcuts)
+                    .setMessage(R.string.shortcuts_text)
+                    .setPositiveButton(R.string.ok, null)
+            )
+            R.id.help_about -> showAbout()
             else -> return super.onOptionsItemSelected(item)
         }
         return true
@@ -1429,6 +1537,307 @@ class EditorActivity : Activity(), EditorView.Listener {
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
         invalidateOptionsMenu()
+        statusBar.setZoomVisible(newConfig.screenWidthDp >= NARROW_DP)
+        scheduleStatus()
+    }
+
+    // ------------------------------------------------------ find / replace (§5.12)
+
+    private var matchSpan: BackgroundColorSpan? = null
+
+    private fun showFindBar(replace: Boolean) {
+        val wasVisible = findBar.visibility == View.VISIBLE
+        findBar.visibility = View.VISIBLE
+        findBar.showReplace(replace && !doc.access.isViewOnly)
+        val s = minOf(editor.selectionStart, editor.selectionEnd)
+        val e = maxOf(editor.selectionStart, editor.selectionEnd)
+        val selected = if (e > s && e - s <= MAX_PREFILL) editor.text.subSequence(s, e).toString() else ""
+        when {
+            selected.isNotEmpty() && selected.indexOf('\n') < 0 -> findBar.findField.setText(selected)
+            !wasVisible && findBar.term.isEmpty() -> findBar.findField.setText(session.findTerm)
+        }
+        val field = if (replace && wasVisible && findBar.term.isNotEmpty()) findBar.replaceField else findBar.findField
+        field.requestFocus()
+        field.selectAll()
+        getSystemService(InputMethodManager::class.java)?.showSoftInput(field, 0)
+        session.findVisible = true
+        session.replaceVisible = findBar.isReplaceVisible
+        updateBackCallback()
+    }
+
+    private fun restoreFindBar() {
+        if (!session.findVisible) return
+        findBar.visibility = View.VISIBLE
+        findBar.findField.setText(session.findTerm)
+        findBar.replaceField.setText(session.replaceTerm)
+        findBar.showReplace(session.replaceVisible && !doc.access.isViewOnly)
+    }
+
+    override fun onFindClosed() {
+        session.findTerm = findBar.term
+        session.findVisible = false
+        findBar.visibility = View.GONE
+        clearMatchHighlight()
+        editor.requestFocus()
+        updateBackCallback()
+    }
+
+    override fun onFindOptionsChanged(matchCase: Boolean, wrap: Boolean) {
+        settings.findMatchCase = matchCase
+        settings.findWrapAround = wrap
+    }
+
+    override fun onFind(forward: Boolean) = runFind(findBar.term, forward)
+
+    /** F3 / Shift+F3 / Find Next / Find Previous, also with the bar closed (Notepad behavior). */
+    private fun findAgain(forward: Boolean) {
+        val term = if (findBar.visibility == View.VISIBLE) findBar.term else session.findTerm.ifEmpty { findBar.term }
+        if (term.isEmpty()) {
+            showFindBar(replace = false)
+            return
+        }
+        runFind(term, forward)
+    }
+
+    private fun runFind(term: String, forward: Boolean) {
+        if (term.isEmpty()) return
+        session.findTerm = term
+        session.lastSearchForward = forward
+        val text = session.snapshot(editor.text)
+        val rev = session.revision
+        val from = if (forward) maxOf(editor.selectionStart, editor.selectionEnd) else minOf(editor.selectionStart, editor.selectionEnd)
+        val matchCase = settings.findMatchCase
+        val wrap = settings.findWrapAround
+        session.work.onCompute({ SearchEngine.find(text, term, from, forward, matchCase, wrap) }) { r ->
+            if (session.revision != rev) return@onCompute
+            val i = r.getOrDefault(-1)
+            if (i < 0) {
+                toast(getString(R.string.cannot_find, term))
+            } else {
+                editor.setSelection(i, i + term.length)
+                highlightMatch(i, i + term.length)
+                editor.post {
+                    editor.bringPointIntoView(i + term.length)
+                    editor.bringPointIntoView(i)
+                }
+            }
+        }
+    }
+
+    /** Selections aren't drawn while the find field has focus, so the match gets a highlight span. */
+    private fun highlightMatch(start: Int, end: Int) {
+        clearMatchHighlight()
+        val span = BackgroundColorSpan(getColor(R.color.toggle_on))
+        editor.text.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        matchSpan = span
+    }
+
+    private fun clearMatchHighlight() {
+        matchSpan?.let { editor.text.removeSpan(it) }
+        matchSpan = null
+    }
+
+    /** Replace the selection if it is a match, then find the next one (§5.13). */
+    override fun onReplace() {
+        if (doc.access.isViewOnly) return
+        val term = findBar.term
+        if (term.isEmpty()) return
+        val s = minOf(editor.selectionStart, editor.selectionEnd)
+        val e = maxOf(editor.selectionStart, editor.selectionEnd)
+        if (e > s && SearchEngine.matches(editor.text.subSequence(s, e), term, settings.findMatchCase)) {
+            val replacement = findBar.replacement
+            session.undo.breakGroup()
+            editor.text.replace(s, e, replacement)
+            session.undo.breakGroup()
+            editor.setSelection(s + replacement.length)
+        }
+        runFind(term, true)
+    }
+
+    override fun onReplaceAll() {
+        if (doc.access.isViewOnly || findBar.term.isEmpty()) return
+        if (editor.length() > UndoManager.MAX_CHARS) {
+            showDialog(
+                AlertDialog.Builder(this)
+                    .setMessage(R.string.replace_all_no_undo)
+                    .setPositiveButton(R.string.replace_all) { _, _ -> replaceAll(undoable = false) }
+                    .setNegativeButton(R.string.cancel, null)
+            )
+        } else {
+            replaceAll(undoable = true)
+        }
+    }
+
+    /** Replaces every occurrence as one undo group (§5.13). */
+    private fun replaceAll(undoable: Boolean) {
+        val term = findBar.term
+        val replacement = findBar.replacement
+        val matchCase = settings.findMatchCase
+        val text = session.snapshot(editor.text)
+        val rev = session.revision
+        showProgress(true)
+        session.work.onCompute({ SearchEngine.replaceAll(text, term, replacement, matchCase) }) { r ->
+            showProgress(false)
+            if (session.revision != rev) return@onCompute
+            val result = r.getOrNull() ?: return@onCompute
+            if (result.count == 0) {
+                toast(getString(R.string.cannot_find, term))
+                return@onCompute
+            }
+            val caret = editor.selectionEnd
+            val line = session.lines.lineOf(caret)
+            val col = caret - session.lines.lineStart(line)
+            clearMatchHighlight()
+            val editable = editor.text
+            if (undoable) {
+                session.undo.breakGroup()
+                editable.replace(0, editable.length, result.text)
+                session.undo.breakGroup()
+            } else {
+                loading = true
+                try {
+                    editable.replace(0, editable.length, result.text)
+                } finally {
+                    loading = false
+                }
+                session.lines.rebuild(result.text)
+                session.revision++
+                session.clearSnapshot()
+                session.undo.discardHistory()
+                onDocumentChanged()
+            }
+            editor.applyTabStops()
+            val l = line.coerceAtMost(session.lines.lineCount - 1)
+            val lineEnd = if (l + 1 < session.lines.lineCount) session.lines.lineStart(l + 1) - 1 else editable.length
+            editor.setSelection((session.lines.lineStart(l) + col).coerceAtMost(lineEnd))
+            toast(resources.getQuantityString(R.plurals.replaced_count, result.count, result.count))
+        }
+    }
+
+    // ---------------------------------------------------- go to, time/date, view
+
+    private fun showGoTo() {
+        val line = session.lines.lineOf(editor.selectionEnd.coerceAtLeast(0)) + 1
+        Dialogs.goToLine(this, ::showDialog, line, session.lines.lineCount) { n ->
+            val offset = session.lines.lineStart(n - 1)
+            editor.requestFocus()
+            editor.setSelection(offset)
+            editor.post { editor.bringPointIntoView(offset) }
+        }
+    }
+
+    /** F5: Notepad's time/date stamp at the caret, one undo step (§5.15). */
+    private fun insertTimeDate() {
+        if (doc.access.isViewOnly) return
+        val s = minOf(editor.selectionStart, editor.selectionEnd).coerceAtLeast(0)
+        val e = maxOf(editor.selectionStart, editor.selectionEnd).coerceAtLeast(0)
+        session.undo.breakGroup()
+        editor.text.replace(s, e, TimeDate.now(this))
+        session.undo.breakGroup()
+    }
+
+    /** "Save with encoding": no re-decoding; takes effect on the next save (§5.24). */
+    private fun setEncoding(e: Encoding) {
+        if (doc.access.isViewOnly || e == doc.encoding) return
+        if (e.isUtf16 && !doc.encoding.isUtf16) doc.hadBom = true
+        doc.encoding = e
+        doc.metadataDirty = true
+        onMetadataChanged()
+    }
+
+    private fun setLineEnding(eol: LineEnding) {
+        if (doc.access.isViewOnly || (eol == doc.lineEnding && !doc.mixedLineEndings)) return
+        doc.lineEnding = eol
+        doc.mixedLineEndings = false
+        session.mixedCounts = null
+        doc.metadataDirty = true
+        onMetadataChanged()
+    }
+
+    private fun onMetadataChanged() {
+        updateTitle()
+        updateBackCallback()
+        scheduleStatus()
+        scheduleRecovery()
+    }
+
+    private fun chooseEncoding() {
+        if (doc.access.isViewOnly) return
+        val popup = PopupMenu(this, statusBar.encoding)
+        Encoding.entries.forEachIndexed { i, e -> popup.menu.add(1, i, i, e.label) }
+        popup.menu.setGroupCheckable(1, true, true)
+        popup.menu.findItem(doc.encoding.ordinal)?.isChecked = true
+        popup.setOnMenuItemClickListener {
+            setEncoding(Encoding.entries[it.itemId])
+            true
+        }
+        popup.show()
+    }
+
+    private fun chooseLineEnding() {
+        if (doc.access.isViewOnly) return
+        val popup = PopupMenu(this, statusBar.lineEnding)
+        LineEnding.entries.forEachIndexed { i, e -> popup.menu.add(1, i, i, e.label) }
+        popup.menu.setGroupCheckable(1, true, true)
+        if (!doc.mixedLineEndings) popup.menu.findItem(doc.lineEnding.ordinal)?.isChecked = true
+        popup.setOnMenuItemClickListener {
+            setLineEnding(LineEnding.entries[it.itemId])
+            true
+        }
+        popup.show()
+    }
+
+    // ---------------------------------------------------------- print (§5.7)
+
+    private fun print() {
+        val manager = getSystemService(PrintManager::class.java) ?: return
+        val now = Date()
+        val adapter = TextPrintAdapter(
+            context = this,
+            text = editor.text.toString(),
+            fileName = doc.displayName,
+            typeface = Typeface.create(settings.fontFamily, settings.fontStyle),
+            fontSizePt = settings.printFontSizePt,
+            marginsMm = settings.pageMarginsMm,
+            header = settings.pageHeader,
+            footer = settings.pageFooter,
+            date = android.text.format.DateFormat.getDateFormat(this).format(now),
+            time = android.text.format.DateFormat.getTimeFormat(this).format(now),
+            worker = session.work.compute,
+            main = session.work.main,
+            onFailed = { toast(getString(R.string.print_failed)) },
+        )
+        try {
+            manager.print(doc.displayName, adapter, null)
+        } catch (e: Exception) {
+            toast(getString(R.string.print_failed))
+        }
+    }
+
+    private fun showPageSetup() {
+        Dialogs.pageSetup(
+            this, ::showDialog,
+            Dialogs.PageSetup(settings.pageMarginsMm, settings.pageHeader, settings.pageFooter, settings.printFontSizePt),
+        ) { p ->
+            settings.pageMarginsMm = p.marginsMm
+            settings.pageHeader = p.header
+            settings.pageFooter = p.footer
+            settings.printFontSizePt = p.fontSizePt
+        }
+    }
+
+    private fun showAbout() {
+        val version = try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+        } catch (e: PackageManager.NameNotFoundException) {
+            ""
+        }
+        showDialog(
+            AlertDialog.Builder(this)
+                .setTitle(R.string.app_name)
+                .setMessage(getString(R.string.about_text, version))
+                .setPositiveButton(R.string.ok, null)
+        )
     }
 
     // --------------------------------------------------------------- edit commands
@@ -1472,16 +1881,60 @@ class EditorActivity : Activity(), EditorView.Listener {
         val ctrl = e.isCtrlPressed || e.isMetaPressed
         val shift = e.isShiftPressed
         val inEditor = currentFocus === editor
-        if (!ctrl) return false
+        if (!ctrl) {
+            when (e.keyCode) {
+                KeyEvent.KEYCODE_F3 -> findAgain(if (shift) !session.lastSearchForward else session.lastSearchForward)
+                KeyEvent.KEYCODE_F5 -> insertTimeDate()
+                KeyEvent.KEYCODE_ESCAPE -> if (findBar.visibility == View.VISIBLE) onFindClosed() else return false
+                else -> return false
+            }
+            return true
+        }
         when (e.keyCode) {
             KeyEvent.KEYCODE_N -> runWithSavePrompt(PendingAction(PendingAction.Kind.NEW))
             KeyEvent.KEYCODE_O -> runWithSavePrompt(PendingAction(PendingAction.Kind.OPEN_PICKER))
             KeyEvent.KEYCODE_S -> if (shift) saveAs() else save()
+            KeyEvent.KEYCODE_P -> print()
             KeyEvent.KEYCODE_Z -> if (inEditor) { if (shift) redo() else undo() } else return false
             KeyEvent.KEYCODE_Y -> if (inEditor) redo() else return false
+            KeyEvent.KEYCODE_F -> showFindBar(replace = false)
+            KeyEvent.KEYCODE_H -> showFindBar(replace = true)
+            KeyEvent.KEYCODE_G -> showGoTo()
+            KeyEvent.KEYCODE_EQUALS, KeyEvent.KEYCODE_PLUS, KeyEvent.KEYCODE_NUMPAD_ADD -> zoomBy(ZOOM_STEP)
+            KeyEvent.KEYCODE_MINUS, KeyEvent.KEYCODE_NUMPAD_SUBTRACT -> zoomBy(-ZOOM_STEP)
+            KeyEvent.KEYCODE_0, KeyEvent.KEYCODE_NUMPAD_0 -> setZoom(100)
             else -> return false
         }
         return true
+    }
+
+    /** Advertises the shortcuts to the system helper (Meta+/). */
+    override fun onProvideKeyboardShortcuts(data: MutableList<KeyboardShortcutGroup>, menu: Menu?, deviceId: Int) {
+        val ctrl = KeyEvent.META_CTRL_ON
+        fun k(label: Int, key: Int, mods: Int = ctrl) = KeyboardShortcutInfo(getString(label), key, mods)
+        data.add(
+            KeyboardShortcutGroup(
+                getString(R.string.app_name),
+                listOf(
+                    k(R.string.new_document, KeyEvent.KEYCODE_N),
+                    k(R.string.open_short, KeyEvent.KEYCODE_O),
+                    k(R.string.save, KeyEvent.KEYCODE_S),
+                    k(R.string.save_as, KeyEvent.KEYCODE_S, ctrl or KeyEvent.META_SHIFT_ON),
+                    k(R.string.print_menu, KeyEvent.KEYCODE_P),
+                    k(R.string.undo, KeyEvent.KEYCODE_Z),
+                    k(R.string.redo, KeyEvent.KEYCODE_Y),
+                    k(R.string.find_menu, KeyEvent.KEYCODE_F),
+                    k(R.string.find_next, KeyEvent.KEYCODE_F3, 0),
+                    k(R.string.find_previous, KeyEvent.KEYCODE_F3, KeyEvent.META_SHIFT_ON),
+                    k(R.string.replace_menu, KeyEvent.KEYCODE_H),
+                    k(R.string.go_to_menu, KeyEvent.KEYCODE_G),
+                    k(R.string.time_date, KeyEvent.KEYCODE_F5, 0),
+                    k(R.string.zoom_in, KeyEvent.KEYCODE_EQUALS),
+                    k(R.string.zoom_out, KeyEvent.KEYCODE_MINUS),
+                    k(R.string.restore_zoom, KeyEvent.KEYCODE_0),
+                ),
+            ),
+        )
     }
 
     // --------------------------------------------------------------- appearance
@@ -1494,6 +1947,67 @@ class EditorActivity : Activity(), EditorView.Listener {
 
     private fun applyWordWrap() {
         editor.setHorizontallyScrolling(!settings.wordWrap)
+    }
+
+    private fun toggleWordWrap() {
+        settings.wordWrap = !settings.wordWrap
+        applyWordWrap()
+        if (settings.wordWrap) editor.scrollTo(0, editor.scrollY)
+        editor.post { editor.bringPointIntoView(editor.selectionEnd) }
+    }
+
+    private fun zoomBy(delta: Int) = setZoom(settings.zoomPercent + delta)
+
+    private fun setZoom(percent: Int) {
+        settings.zoomPercent = percent.coerceIn(Settings.ZOOM_MIN, Settings.ZOOM_MAX)
+        applyFont()
+        scheduleStatus()
+        editor.post { editor.bringPointIntoView(editor.selectionEnd) }
+    }
+
+    private fun showFontDialog() {
+        Dialogs.font(
+            this, ::showDialog,
+            Dialogs.FontChoice(settings.fontFamily, settings.fontStyle, settings.fontSizeSp),
+        ) { c ->
+            settings.fontFamily = c.family
+            settings.fontStyle = c.style
+            settings.fontSizeSp = c.sizeSp
+            applyFont()
+        }
+    }
+
+    private fun applyStatusBarVisibility() {
+        statusBar.visibility = if (settings.statusBar) View.VISIBLE else View.GONE
+        statusBar.setZoomVisible(resources.configuration.screenWidthDp >= NARROW_DP)
+        scheduleStatus()
+    }
+
+    /** Coalesces status updates to one per frame (§5.19). */
+    private fun scheduleStatus() {
+        if (statusPosted || statusBar.visibility != View.VISIBLE) return
+        statusPosted = true
+        editor.postOnAnimation(statusRunnable)
+    }
+
+    private fun updateStatus() {
+        if (statusBar.visibility != View.VISIBLE) return
+        val caret = editor.selectionEnd.coerceAtLeast(0)
+        val line = session.lines.lineOf(caret)
+        val col = caret - session.lines.lineStart(line) + 1
+        statusBar.position.text = getString(R.string.ln_col, line + 1, col)
+        statusBar.position.contentDescription = getString(R.string.a11y_position, line + 1, col)
+        val zoom = settings.zoomPercent
+        statusBar.zoom.text = getString(R.string.zoom_percent, zoom)
+        statusBar.zoom.contentDescription = getString(R.string.a11y_zoom, zoom)
+        val eol = doc.lineEnding.label
+        statusBar.lineEnding.text = if (doc.mixedLineEndings) getString(R.string.mixed_eol, eol) else eol
+        statusBar.lineEnding.contentDescription = getString(R.string.a11y_line_ending, statusBar.lineEnding.text)
+        statusBar.encoding.text = doc.encoding.label
+        statusBar.encoding.contentDescription = getString(R.string.a11y_encoding, doc.encoding.label)
+        val editable = !doc.access.isViewOnly
+        statusBar.lineEnding.isEnabled = editable
+        statusBar.encoding.isEnabled = editable
     }
 
     /** design.md §6.13: draw behind system bars on API 30+ and pad for bars and the IME. */
@@ -1542,6 +2056,11 @@ class EditorActivity : Activity(), EditorView.Listener {
         const val PROGRESS_DELAY_MS = 300L
         const val STAT_THROTTLE_MS = 2000L
         const val WIDE_DP = 600
+        const val NARROW_DP = 360
+        const val ZOOM_STEP = 10
+        const val MAX_PREFILL = 200
+        val ENCODING_ITEMS = intArrayOf(R.id.enc_utf8, R.id.enc_utf8_bom, R.id.enc_utf16le, R.id.enc_utf16be, R.id.enc_ansi)
+        val EOL_ITEMS = intArrayOf(R.id.eol_crlf, R.id.eol_lf, R.id.eol_cr)
         const val RECENT_BASE = 0x7000
         const val REQ_OPEN = 1
         const val REQ_CREATE = 2

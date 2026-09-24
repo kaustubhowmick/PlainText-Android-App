@@ -21,3 +21,13 @@
 - **Shared files and Recent files.** A file received through `ACTION_SEND` + `EXTRA_STREAM` is a read-only copy (§4.7), so it is not added to Recent files.
 - **Shared text is dirty.** Text received through `ACTION_SEND` opens as an `*Untitled` document (§5.26 AC), which means it is protected by the recovery buffer and the unsaved-changes prompt like any typed text.
 - **"Keep my version" and later saves.** After the user keeps their version following an external change, Save still shows the "changed since you opened it" overwrite prompt, because saving really does overwrite the other app's changes.
+
+## Edit, Format, and View features
+
+- **Find Next starts at the end of the selection.** §5.12 says Find Next searches forward from the end of the current selection, but the §10.1 test note expects overlapping matches ("aa" in "aaa" found at 0, then 1). Those two can't both hold; the behavior spec wins (it is also what Notepad does), so "aa" in "aaa" is found at 0 and then wraps back to 0.
+- **Match highlight.** Android draws an EditText selection only while it has focus, and focus stays in the find field so Enter can repeat the search. The current match therefore also gets a temporary background-color span. It is removed on the next edit, search, or when the bar closes; it never reaches the file (saves use the plain text).
+- **Font dialog layout.** §6.6 shows three lists. Family and style are radio groups; size is a spinner in every layout, because a third scrolling list inside a dialog is awkward on phones. §6.6 already allows spinners on narrow screens.
+- **Status bar height.** §6.1 says 28 dp with 48 dp touch targets via `TouchDelegate`. A view can have only one `TouchDelegate` and there are two tappable segments, so the bar is 48 dp tall. That meets the 48 dp requirement in §5.35 without extending touch areas over the text.
+- **Edge-to-edge before Android 11.** §6.13 pads for system-bar insets on API 26–29 as well. There, the app lets the system fit the window instead, with theme-colored status and navigation bars and light/dark icons from the theme. The visual result is the same, and it avoids deprecated `SYSTEM_UI_FLAG` layout flags.
+- **About text.** §5.21 asks for the license name, but the repository has no license file yet, so the About box doesn't name one. Add the license name to `about_text` once one is chosen.
+- **F3/F5 in menus.** Framework menus can only display letter shortcuts with modifiers, so F3, Shift+F3, and F5 are not shown next to their menu items. They work, and they are listed in Help ▸ Keyboard Shortcuts and in the system shortcut helper (Meta+/).

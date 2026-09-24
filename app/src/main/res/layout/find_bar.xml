@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="8dp">
+
+        <EditText
+            android:id="@+id/find_field"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:hint="@string/find_hint"
+            android:imeOptions="actionSearch|flagNoExtractUi"
+            android:importantForAutofill="no"
+            android:inputType="text"
+            android:singleLine="true" />
+
+        <ImageButton
+            android:id="@+id/find_prev"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/find_previous_match"
+            android:src="@drawable/ic_up"
+            android:tooltipText="@string/find_previous_match" />
+
+        <ImageButton
+            android:id="@+id/find_next"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/find_next_match"
+            android:src="@drawable/ic_down"
+            android:tooltipText="@string/find_next_match" />
+
+        <ToggleButton
+            android:id="@+id/find_match_case"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_toggle"
+            android:contentDescription="@string/match_case"
+            android:minWidth="48dp"
+            android:textOff="Aa"
+            android:textOn="Aa"
+            android:tooltipText="@string/match_case" />
+
+        <ToggleButton
+            android:id="@+id/find_wrap"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_toggle"
+            android:contentDescription="@string/wrap_around"
+            android:minWidth="48dp"
+            android:paddingHorizontal="6dp"
+            android:textAllCaps="false"
+            android:textOff="@string/wrap_short"
+            android:textOn="@string/wrap_short"
+            android:tooltipText="@string/wrap_around" />
+
+        <ImageButton
+            android:id="@+id/find_close"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/close_find"
+            android:src="@drawable/ic_close"
+            android:tooltipText="@string/close_find" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/replace_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="4dp"
+        android:visibility="gone">
+
+        <EditText
+            android:id="@+id/replace_field"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:hint="@string/replace_hint"
+            android:imeOptions="actionDone|flagNoExtractUi"
+            android:importantForAutofill="no"
+            android:inputType="text"
+            android:singleLine="true" />
+
+        <Button
+            android:id="@+id/replace_one"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:contentDescription="@string/replace"
+            android:text="@string/replace"
+            android:textAllCaps="false" />
+
+        <Button
+            android:id="@+id/replace_all"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:contentDescription="@string/replace_all"
+            android:text="@string/replace_all_short"
+            android:textAllCaps="false" />
+    </LinearLayout>
+</merge>

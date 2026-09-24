@@ -37,6 +37,13 @@
             android:visibility="gone" />
     </FrameLayout>
 
+    <io.github.kaustubhowmick.plaintext.ui.FindBar
+        android:id="@+id/find_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/bar"
+        android:visibility="gone" />
+
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -60,5 +67,18 @@
             android:saveEnabled="false"
             android:scrollbars="vertical|horizontal"
             android:textColor="?android:attr/textColorPrimary" />
+
+        <io.github.kaustubhowmick.plaintext.ui.FastScroller
+            android:id="@+id/fast_scroller"
+            android:layout_width="24dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:visibility="gone" />
     </FrameLayout>
+
+    <io.github.kaustubhowmick.plaintext.ui.StatusBarView
+        android:id="@+id/status_bar"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@color/bar" />
 </LinearLayout>
