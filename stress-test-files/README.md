@@ -9,6 +9,8 @@ cd stress-test-files && sha256sum -c checksums.txt     # verify
 
 The generator is deterministic, so a fresh run matches the committed `checksums.txt`. The three largest files (`normal-10MB.txt`, `normal-50MB.txt`, `single-line-5MB.txt`) are git-ignored to keep the repository small. Run the script to create them, or download the **stress-test-files** artifact from any **Build** run in the Actions tab. That artifact has every file plus `checksums.txt`.
 
+The **Emulator stress run** workflow (Actions tab, **Run workflow**) opens these files on an Android emulator and logs crashes, "not responding" errors, and how long each step takes. The script is `.github/emulator/stress-smoke.sh`.
+
 To get the files onto a phone: `adb push stress-test-files/files /sdcard/Download/stress-test-files`
 
 ## What each file tests
@@ -21,8 +23,8 @@ To get the files onto a phone: `adb push stress-test-files/files /sdcard/Downloa
 | `normal-1MB.txt` | 1,048,576 bytes of LF prose | Above the 1,000,000-char large-file threshold: progress bar + "Large file" toast (§5.31). |
 | `normal-10MB.txt` | 10,485,760 bytes, exactly the limit | Still editable (the limit is "> 10 MB"). |
 | `normal-50MB.txt` | 52,428,800 bytes | Oversized dialog → read-only preview of the first 10 MB. |
-| `single-line-5MB.txt` | 5 MB with no line breaks | Word Wrap on/off, horizontal scroll, Go To Line (1 line), End key. |
-| `500000-short-lines.txt` | 500,000 lines of 0–3 chars | `LineIndex`, Go To Line 500000, fast scroller, Ln/Col in the status bar. |
+| `single-line-5MB.txt` | 5 MB with no line breaks | "Very long lines" dialog: Open read-only / Edit anyway (each edit re-measures the whole line). Word Wrap on/off, horizontal scroll, End key. |
+| `500000-short-lines.txt` | 500,000 lines of 0–3 chars | Opens without running out of memory (text is laid out in slices). Zoom, Word Wrap, and rotation too. Go To Line 500000, fast scroller. |
 | `encoding-utf8.txt` | UTF-8, no BOM | Status bar `UTF-8`. |
 | `encoding-utf8-bom.txt` | UTF-8 with BOM | `UTF-8 with BOM`; BOM kept on save. |
 | `bom-only.txt` | Just `EF BB BF` | Empty document, `UTF-8 with BOM`. |
